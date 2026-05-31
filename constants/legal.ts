@@ -1,0 +1,62 @@
+export const LEGAL_LAST_UPDATED = "May 31, 2026";
+
+export const LEGAL_ROUTES = {
+  privacy: "/(public)/legal/privacy",
+  terms: "/(public)/legal/terms"
+} as const;
+
+export const PRIVACY_POLICY_SECTIONS = [
+  {
+    title: "Data Leaflet collects",
+    body:
+      "Leaflet collects account identifiers from Supabase Auth, plant photos you choose to scan or save, plant collection details, care tasks, care logs, diagnosis results, and local preferences such as onboarding and reminder settings."
+  },
+  {
+    title: "Photo and AI processing",
+    body:
+      "Photos submitted for identification or diagnosis are sent to Leaflet's Supabase Edge Function, then processed with OpenAI to produce plant identification, care, or diagnosis guidance. Do not upload photos that contain people, private documents, or sensitive surroundings."
+  },
+  {
+    title: "Storage and service providers",
+    body:
+      "Leaflet stores app data and uploaded plant photos in Supabase. OpenAI is used only to process scan and diagnosis requests. Leaflet does not sell personal data to third parties."
+  },
+  {
+    title: "User control and deletion",
+    body:
+      "You can delete plants from your collection in the app. For account deletion or complete data removal during beta, contact the app owner with the email tied to your Supabase account."
+  },
+  {
+    title: "Beta limitations",
+    body:
+      "Leaflet is an MVP beta. Plant identification and diagnosis output can be wrong, and diagnosis guidance is informational only. For serious plant, pet, or human safety concerns, consult a qualified expert."
+  }
+] as const;
+
+export const TERMS_SECTIONS = [
+  {
+    title: "Using Leaflet",
+    body:
+      "Leaflet helps you identify houseplants, save a plant collection, track care, and review informational plant-health guidance. You are responsible for checking results before acting on them."
+  },
+  {
+    title: "Accounts and access",
+    body:
+      "You must use a supported Apple or Google sign-in method. Keep your account secure and only upload photos and plant records that you have the right to use."
+  },
+  {
+    title: "AI and diagnosis disclaimer",
+    body:
+      "Leaflet's AI results are not guaranteed to be accurate. Diagnosis output is educational plant-care guidance, not professional agricultural, veterinary, medical, or safety advice."
+  },
+  {
+    title: "Acceptable use",
+    body:
+      "Do not upload illegal, harmful, private, or non-plant content. Do not attempt to bypass rate limits, access another user's data, or interfere with Leaflet's Supabase backend."
+  },
+  {
+    title: "Beta changes",
+    body:
+      "Features, data model, and availability may change during TestFlight and beta testing. Leaflet is provided as-is while the MVP is being validated."
+  }
+] as const;
