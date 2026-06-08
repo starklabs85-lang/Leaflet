@@ -36,9 +36,10 @@ type OnboardingContextValue = {
 };
 
 const ONBOARDING_COMPLETE_KEY = "onboarding_complete";
-const ONBOARDING_SKIPPED_KEY = "leaflet:onboarding_skipped";
-const ONBOARDING_INTENT_KEY = "leaflet:onboarding_intent";
-const ONBOARDING_ACTIVATION_KEY = "leaflet:onboarding_activation";
+// SecureStore rejects ":" in keys, so namespaces use "." (alphanumeric, ".", "-", "_" only).
+const ONBOARDING_SKIPPED_KEY = "leaflet.onboarding_skipped";
+const ONBOARDING_INTENT_KEY = "leaflet.onboarding_intent";
+const ONBOARDING_ACTIVATION_KEY = "leaflet.onboarding_activation";
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 

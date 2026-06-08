@@ -12,6 +12,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import {
   isUserCancelledAuthError,
   signInWithAppleIdToken,
+  signInWithDevTestAccount,
   signInWithGoogleIdToken,
   signOutOfNativeProviders
 } from "@/lib/auth";
@@ -19,7 +20,7 @@ import { getSupabaseConfigIssue, hasSupabaseConfig } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
 
 type AuthStatus = "loading" | "authenticated" | "signed-out" | "missing-config";
-type AuthProviderName = "apple" | "google";
+type AuthProviderName = "apple" | "google" | "dev";
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -30,6 +31,7 @@ type AuthContextValue = {
   isLoading: boolean;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithDevTest: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 };
@@ -54,20 +56,30 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const supabase = getSupabaseClient();
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!isMounted) {
-        return;
-      }
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!isMounted) {
+          return;
+        }
 
-      if (error) {
-        setErrorMessage(error.message);
+        if (error) {
+          setErrorMessage(error.message);
+          setStatus("signed-out");
+          return;
+        }
+
+        setSession(data.session);
+        setStatus(data.session ? "authenticated" : "signed-out");
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setErrorMessage(getAuthStartupErrorMessage(error));
         setStatus("signed-out");
-        return;
-      }
-
-      setSession(data.session);
-      setStatus(data.session ? "authenticated" : "signed-out");
-    });
+      });
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
@@ -89,11 +101,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await action();
       } catch (error) {
         if (!isUserCancelledAuthError(error)) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "Sign-in failed. Please try again."
-          );
+          const message = formatAuthError(error);
+
+          console.warn("Leaflet auth action failed", {
+            provider,
+            message,
+            error
+          });
+          setErrorMessage(message);
         }
       } finally {
         setActiveProvider(null);
@@ -112,6 +127,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       runAuthAction("google", async () => {
         await signInWithGoogleIdToken();
       }),
+    [runAuthAction]
+  );
+
+  const signInWithDevTest = useCallback(
+    () => runAuthAction("dev", signInWithDevTestAccount),
     [runAuthAction]
   );
 
@@ -151,6 +171,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isLoading: status === "loading" || activeProvider !== null,
       signInWithApple,
       signInWithGoogle,
+      signInWithDevTest,
       signOut,
       clearError
     }),
@@ -161,6 +182,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       session,
       signInWithApple,
       signInWithGoogle,
+      signInWithDevTest,
       signOut,
       status
     ]
@@ -177,4 +199,30 @@ export function useAuth() {
   }
 
   return context;
+}
+
+// Surfaces the native status code from @react-native-google-signin so a
+// generic "Sign in failed" becomes diagnosable. DEVELOPER_ERROR (10) almost
+// always means the package name + signing SHA-1 are not registered on an
+// Android OAuth client in Google Cloud (or haven't propagated yet).
+function formatAuthError(error: unknown) {
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String((error as { code: unknown }).code)
+      : null;
+
+  const message =
+    error instanceof Error ? error.message : "Sign-in failed. Please try again.";
+
+  if (code === "DEVELOPER_ERROR" || code === "10") {
+    return "Sign-in failed (DEVELOPER_ERROR): the app's package name and signing SHA-1 are not registered on an Android OAuth client in Google Cloud.";
+  }
+
+  return code ? `${message} (code: ${code})` : message;
+}
+
+function getAuthStartupErrorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : "Leaflet could not restore your session. Please sign in again.";
 }

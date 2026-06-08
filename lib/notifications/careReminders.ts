@@ -59,9 +59,10 @@ export type CareReminderResult =
     };
 
 const CARE_REMINDER_CHANNEL_ID = "care-reminders";
-const ENABLED_KEY = "leaflet:care-reminders-enabled";
-const PROMPT_SEEN_KEY = "leaflet:care-reminders-prompt-seen";
-const SCHEDULE_STORE_KEY = "leaflet:care-reminder-schedule";
+// SecureStore rejects ":" in keys; namespaces use "." (alphanumeric, ".", "-", "_" only).
+const ENABLED_KEY = "leaflet.care-reminders-enabled";
+const PROMPT_SEEN_KEY = "leaflet.care-reminders-prompt-seen";
+const SCHEDULE_STORE_KEY = "leaflet.care-reminder-schedule";
 
 let lastHandledNotificationId: string | null = null;
 

@@ -5,7 +5,8 @@ export const STREAK_MILESTONES = [7, 14, 30, 100] as const;
 export type StreakMilestone = (typeof STREAK_MILESTONES)[number];
 
 function getMilestoneKey(userId: string) {
-  return `leaflet:care_streak_milestones:${userId}`;
+  // SecureStore rejects ":" in keys; use "." (UUIDs only contain valid chars).
+  return `leaflet.care_streak_milestones.${userId}`;
 }
 
 export async function getPendingStreakMilestone({

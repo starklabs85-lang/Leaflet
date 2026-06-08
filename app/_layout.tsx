@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Fredoka_600SemiBold,
   Fredoka_700Bold
@@ -28,6 +28,7 @@ import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvide
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function RootLayout() {
+  const [fontLoadTimedOut, setFontLoadTimedOut] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     Fredoka_600SemiBold,
     Fredoka_700Bold,
@@ -36,17 +37,28 @@ export default function RootLayout() {
     Nunito_700Bold,
     Nunito_800ExtraBold
   });
+  const canRender = fontsLoaded || Boolean(fontError) || fontLoadTimedOut;
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync().catch(() => undefined);
+      return undefined;
     }
+
+    const timeout = setTimeout(() => setFontLoadTimedOut(true), 3000);
+
+    return () => clearTimeout(timeout);
   }, [fontsLoaded, fontError]);
 
-  // Hold the splash until fonts resolve. If loading fails, render anyway with
-  // the system fallback rather than blocking the app forever.
-  if (!fontsLoaded && !fontError) {
-    return null;
+  useEffect(() => {
+    if (canRender) {
+      SplashScreen.hideAsync().catch(() => undefined);
+    }
+  }, [canRender]);
+
+  // Hold briefly for brand fonts, then render with system fallback instead of
+  // leaving users on a blank native splash if font loading stalls.
+  if (!canRender) {
+    return <LoadingScreen message="Loading Leaflet..." />;
   }
 
   return (
@@ -108,13 +120,7 @@ function AuthGate() {
   }, [auth.status, onboarding.isLoading, onboarding.status, router, segments]);
 
   if (auth.status === "loading" || onboarding.isLoading) {
-    return (
-      <View style={styles.loadingScreen}>
-        <Text style={styles.loadingEyebrow}>Leaflet</Text>
-        <Text style={styles.loadingText}>Restoring your session...</Text>
-        <StatusBar style="dark" />
-      </View>
-    );
+    return <LoadingScreen message="Restoring your session..." />;
   }
 
   return (
@@ -132,6 +138,16 @@ function AuthGate() {
       <OfflineBanner />
       <StatusBar style="dark" />
     </>
+  );
+}
+
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <View style={styles.loadingScreen}>
+      <Text style={styles.loadingEyebrow}>Leaflet</Text>
+      <Text style={styles.loadingText}>{message}</Text>
+      <StatusBar style="dark" />
+    </View>
   );
 }
 

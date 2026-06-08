@@ -3,8 +3,16 @@ export const env = {
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
   googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
   googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "",
-  googleIosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ?? ""
+  googleIosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ?? "",
+  devTestEmail: process.env.EXPO_PUBLIC_DEV_TEST_EMAIL ?? "",
+  devTestPassword: process.env.EXPO_PUBLIC_DEV_TEST_PASSWORD ?? ""
 };
+
+// Dev-only email/password bypass for testing the app while native OAuth is
+// unavailable. Never enabled in production builds.
+export function hasDevTestLogin() {
+  return __DEV__ && Boolean(env.devTestEmail && env.devTestPassword);
+}
 
 export function hasSupabaseConfig() {
   return Boolean(env.supabaseUrl && env.supabaseAnonKey);

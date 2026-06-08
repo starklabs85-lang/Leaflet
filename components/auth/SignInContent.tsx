@@ -18,6 +18,7 @@ import { PlaceholderScreen } from "@/components/PlaceholderScreen";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { LEGAL_ROUTES } from "@/constants/legal";
 import { theme } from "@/constants/theme";
+import { hasDevTestLogin } from "@/lib/env";
 import { useAuth } from "@/providers/AuthProvider";
 
 type SignInContentProps = {
@@ -102,6 +103,22 @@ export function SignInContent({
         )}
       </PressableScale>
 
+      {hasDevTestLogin() ? (
+        <PressableScale
+          accessibilityLabel="Dev test login"
+          accessibilityRole="button"
+          disabled={isAuthDisabled}
+          onPress={auth.signInWithDevTest}
+          style={[styles.devButton, isAuthDisabled && styles.disabled]}
+        >
+          {auth.activeProvider === "dev" ? (
+            <ActivityIndicator color={theme.colors.white} />
+          ) : (
+            <Text style={styles.devButtonText}>Dev test login (bypass OAuth)</Text>
+          )}
+        </PressableScale>
+      ) : null}
+
       <Text style={styles.helperText}>
         By continuing, you agree to Leaflet's Terms and Privacy Policy. Plant
         photos you scan are processed in the cloud with Supabase and OpenAI.
@@ -151,6 +168,14 @@ function getFriendlyAuthError(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("missing")) {
+    return message;
+  }
+
+  if (
+    normalized.includes("developer_error") ||
+    normalized.includes("code:") ||
+    normalized.includes("android oauth")
+  ) {
     return message;
   }
 
@@ -240,6 +265,20 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: theme.spacing.md,
     textAlign: "center"
+  },
+  devButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.forest,
+    borderRadius: theme.radius.lg,
+    height: 54,
+    justifyContent: "center",
+    marginTop: theme.spacing.md,
+    width: "100%"
+  },
+  devButtonText: {
+    color: theme.colors.white,
+    fontFamily: theme.typography.fontFamily.bodyBold,
+    fontSize: theme.typography.body
   },
   disabled: {
     opacity: 0.6
