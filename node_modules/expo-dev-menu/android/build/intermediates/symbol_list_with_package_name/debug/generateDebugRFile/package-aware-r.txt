@@ -1,0 +1,21 @@
+expo.modules.devmenu
+drawable alert
+drawable bug
+drawable copy
+drawable dev_menu_fab_icon
+drawable ellipsis_horizontal
+drawable fast_refresh
+drawable home
+drawable inspect
+drawable performance
+drawable refresh
+drawable refresh_round_icon
+drawable x_close
+font inter_bold
+font inter_medium
+font inter_regular
+font inter_semibold
+font jetbrains_mono_light
+font jetbrains_mono_medium
+font jetbrains_mono_regular
+raw keep

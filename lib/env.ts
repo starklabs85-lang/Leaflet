@@ -4,6 +4,8 @@ export const env = {
   googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
   googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "",
   googleIosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ?? "",
+  revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? "",
+  revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? "",
   devTestEmail: process.env.EXPO_PUBLIC_DEV_TEST_EMAIL ?? "",
   devTestPassword: process.env.EXPO_PUBLIC_DEV_TEST_PASSWORD ?? ""
 };
@@ -29,6 +31,27 @@ export function getSupabaseConfigIssue() {
   ].filter(Boolean);
 
   return `Missing ${missing.join(" and ")}. Copy .env.example to .env and add your Supabase project values.`;
+}
+
+export function hasRevenueCatConfig() {
+  if (process.env.EXPO_OS === "ios") {
+    return Boolean(env.revenueCatIosKey);
+  }
+
+  return Boolean(env.revenueCatAndroidKey);
+}
+
+export function getRevenueCatConfigIssue() {
+  if (hasRevenueCatConfig()) {
+    return null;
+  }
+
+  const missing =
+    process.env.EXPO_OS === "ios"
+      ? "EXPO_PUBLIC_REVENUECAT_IOS_KEY"
+      : "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY";
+
+  return `Missing ${missing}. Add the public RevenueCat SDK key for this platform.`;
 }
 
 export function hasGoogleConfig() {

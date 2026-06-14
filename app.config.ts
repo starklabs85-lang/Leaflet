@@ -27,6 +27,14 @@ const config: ExpoConfig = {
     "expo-image-picker",
     "expo-notifications",
     "expo-apple-authentication",
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "Leaflet uses your approximate location only to tailor plant care tips to your local weather.",
+        isAndroidBackgroundLocationEnabled: false
+      }
+    ],
     ...(googleIosUrlScheme
       ? [
           [

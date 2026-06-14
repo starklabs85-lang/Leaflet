@@ -7,6 +7,15 @@ import { getSupabaseClient } from "@/lib/supabase";
 
 type GoogleSignInModule = typeof import("@react-native-google-signin/google-signin");
 
+export type EmailPasswordCredentials = {
+  email: string;
+  password: string;
+};
+
+export type EmailPasswordSignUpResult =
+  | { status: "signed-in" }
+  | { status: "confirmation-required"; email: string };
+
 let googleSignInModule: GoogleSignInModule | null = null;
 let googleConfigured = false;
 
@@ -147,6 +156,41 @@ export async function signInWithGoogleIdToken() {
   return { cancelled: false };
 }
 
+export async function signInWithEmailPassword({
+  email,
+  password
+}: EmailPasswordCredentials) {
+  const { error } = await getSupabaseClient().auth.signInWithPassword({
+    email: normalizeEmail(email),
+    password
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function signUpWithEmailPassword({
+  email,
+  password
+}: EmailPasswordCredentials): Promise<EmailPasswordSignUpResult> {
+  const normalizedEmail = normalizeEmail(email);
+  const { data, error } = await getSupabaseClient().auth.signUp({
+    email: normalizedEmail,
+    password
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (data.session) {
+    return { status: "signed-in" };
+  }
+
+  return { status: "confirmation-required", email: normalizedEmail };
+}
+
 // Dev-only bypass: sign in with a Supabase email/password test account so the
 // rest of the app can be exercised with a real session (RLS/data all work)
 // while native Google/Apple sign-in is being fixed. Stripped from prod by the
@@ -205,4 +249,8 @@ export async function signOutOfNativeProviders() {
   } catch {
     // Supabase sign-out is the source of truth. Native provider cleanup is best-effort.
   }
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
 }

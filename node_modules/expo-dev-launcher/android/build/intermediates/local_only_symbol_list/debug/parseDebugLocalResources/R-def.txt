@@ -1,0 +1,25 @@
+R_DEF: Internal format may change without notice
+local
+color dev_launcher_backgroundColor
+color dev_launcher_colorAccentDark
+color dev_launcher_colorPrimaryDark
+color dev_launcher_primary
+color dev_launcher_secondaryBackgroundColor
+color dev_launcher_white
+drawable branch_icon
+drawable check_circle
+drawable chevron_right
+drawable download
+drawable expo_logo
+drawable extensions_icon
+drawable home
+drawable log_in
+drawable plus
+drawable scan
+drawable settings
+drawable show_at_launch
+drawable update_icon
+drawable updates_nav
+drawable user
+raw keep
+style Theme.DevLauncher.ErrorActivity

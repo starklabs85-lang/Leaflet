@@ -21,6 +21,7 @@ import { theme } from "@/constants/theme";
 import { useCareReminderNotificationRouting } from "@/lib/notifications/careReminders";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { ConnectivityProvider } from "@/providers/ConnectivityProvider";
+import { EntitlementProvider } from "@/providers/EntitlementProvider";
 import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
 
 // Keep the native splash visible until the brand fonts are ready so we never
@@ -64,11 +65,13 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <OnboardingProvider>
-          <ConnectivityProvider>
-            <AuthGate />
-          </ConnectivityProvider>
-        </OnboardingProvider>
+        <EntitlementProvider>
+          <OnboardingProvider>
+            <ConnectivityProvider>
+              <AuthGate />
+            </ConnectivityProvider>
+          </OnboardingProvider>
+        </EntitlementProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

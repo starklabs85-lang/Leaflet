@@ -157,7 +157,9 @@ export async function diagnosePlantPhoto({
           ? "validation_failed"
           : response.error.code === "empty_response"
             ? "empty_response"
-            : "function_error",
+            : response.error.code === "free_limit_reached"
+              ? "free_limit_reached"
+              : "function_error",
       message: response.error.message
     };
   }

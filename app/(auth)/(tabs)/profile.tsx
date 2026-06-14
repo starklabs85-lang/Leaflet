@@ -18,18 +18,36 @@ import { Screen } from "@/components/ui/Screen";
 import { LEGAL_ROUTES } from "@/constants/legal";
 import { theme } from "@/constants/theme";
 import {
+  clearStoredUserLocation,
+  getStoredUserLocation,
+  type StoredUserLocation
+} from "@/lib/location/userLocation";
+import {
   getCareReminderSettings,
   setCareRemindersEnabled,
   type CareReminderSettings
 } from "@/lib/notifications/careReminders";
+import {
+  isWeatherAlertsEnabled,
+  setWeatherAlertsEnabled
+} from "@/lib/notifications/weatherAlerts";
 import { useAuth } from "@/providers/AuthProvider";
+import { useEntitlement } from "@/providers/EntitlementProvider";
 
 export default function ProfileScreen() {
   const auth = useAuth();
+  const entitlement = useEntitlement();
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [reminderSettings, setReminderSettings] =
     useState<CareReminderSettings | null>(null);
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [isUpdatingReminders, setIsUpdatingReminders] = useState(false);
+  const [weatherAlertsOn, setWeatherAlertsOn] = useState<boolean | null>(null);
+  const [weatherMessage, setWeatherMessage] = useState<string | null>(null);
+  const [isUpdatingWeatherAlerts, setIsUpdatingWeatherAlerts] = useState(false);
+  const [weatherLocation, setWeatherLocation] =
+    useState<StoredUserLocation | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -37,6 +55,16 @@ export default function ProfileScreen() {
     getCareReminderSettings().then((settings) => {
       if (isMounted) {
         setReminderSettings(settings);
+      }
+    });
+    isWeatherAlertsEnabled().then((enabled) => {
+      if (isMounted) {
+        setWeatherAlertsOn(enabled);
+      }
+    });
+    getStoredUserLocation().then((location) => {
+      if (isMounted) {
+        setWeatherLocation(location);
       }
     });
 
@@ -62,11 +90,78 @@ export default function ProfileScreen() {
     setIsUpdatingReminders(false);
   }
 
+  async function toggleWeatherAlerts(enabled: boolean) {
+    setIsUpdatingWeatherAlerts(true);
+    setWeatherMessage(null);
+
+    const result = await setWeatherAlertsEnabled(enabled);
+
+    if (result.ok) {
+      setWeatherAlertsOn(result.enabled);
+      setWeatherMessage(
+        result.enabled
+          ? "Frost alerts are on. We'll warn you the evening a freeze threatens your plants."
+          : "Frost alerts are off."
+      );
+    } else {
+      setWeatherAlertsOn(false);
+      setWeatherMessage(result.message);
+    }
+
+    setIsUpdatingWeatherAlerts(false);
+  }
+
+  async function forgetWeatherLocation() {
+    await clearStoredUserLocation();
+    setWeatherLocation(null);
+    setWeatherMessage("Saved weather location removed.");
+  }
+
+  async function restorePurchases() {
+    if (isRestoring) {
+      return;
+    }
+
+    setIsRestoring(true);
+    setRestoreMessage(null);
+
+    const outcome = await entitlement.restore();
+
+    setIsRestoring(false);
+    setRestoreMessage(
+      outcome.status === "restored"
+        ? "Your Premium subscription has been restored."
+        : outcome.status === "nothing_to_restore"
+          ? "No previous purchases were found for this account."
+          : outcome.message
+    );
+  }
+
   return (
     <Screen
       contentContainerStyle={styles.content}
       header={<ProfileHeader user={auth.user} />}
     >
+      <Text style={styles.sectionLabel}>Membership</Text>
+      <Card padded={false} style={styles.card}>
+        <SettingsLinkRow
+          icon={entitlement.isPremium ? "leaf-circle" : "leaf-circle-outline"}
+          onPress={() => router.push("/(auth)/premium" as never)}
+          title={
+            entitlement.isPremium ? "Leaflet Premium — active" : "Upgrade to Premium"
+          }
+        />
+        <View style={styles.divider} />
+        <SettingsLinkRow
+          icon="restore"
+          onPress={restorePurchases}
+          title={isRestoring ? "Checking purchases..." : "Restore purchases"}
+        />
+      </Card>
+      {restoreMessage ? (
+        <Text style={styles.reminderMessage}>{restoreMessage}</Text>
+      ) : null}
+
       <Text style={styles.sectionLabel}>Preferences</Text>
       <Card style={styles.card}>
         <View style={styles.settingRow}>
@@ -98,6 +193,51 @@ export default function ProfileScreen() {
         ) : null}
         {reminderMessage ? (
           <Text style={styles.reminderMessage}>{reminderMessage}</Text>
+        ) : null}
+      </Card>
+
+      <Card style={styles.card}>
+        <View style={styles.settingRow}>
+          <IconChip icon="snowflake-alert" size={44} />
+          <View style={styles.settingCopy}>
+            <Text style={styles.settingTitle}>Frost alerts</Text>
+            <Text style={styles.settingText}>
+              An evening warning when frost threatens your outdoor plants.
+            </Text>
+          </View>
+          {weatherAlertsOn === null ? (
+            <ActivityIndicator color={theme.colors.forest} />
+          ) : (
+            <Switch
+              accessibilityLabel="Toggle frost alerts"
+              disabled={isUpdatingWeatherAlerts}
+              onValueChange={toggleWeatherAlerts}
+              thumbColor={theme.colors.white}
+              trackColor={{ false: theme.colors.line, true: theme.colors.leaf }}
+              value={weatherAlertsOn}
+            />
+          )}
+        </View>
+        <Text style={styles.settingMeta}>
+          {weatherLocation
+            ? `Weather location: ${weatherLocation.label ?? "approximate coordinates"} (${
+                weatherLocation.source === "gps" ? "from device" : "set manually"
+              }). Kept coarse (~1 km) and used only to fetch weather.`
+            : "No weather location saved. Set one from the dashboard's weather card."}
+        </Text>
+        {weatherLocation ? (
+          <PressableScale
+            accessibilityLabel="Remove saved weather location"
+            accessibilityRole="button"
+            haptic={false}
+            onPress={forgetWeatherLocation}
+            style={styles.inlineLink}
+          >
+            <Text style={styles.inlineLinkText}>Remove saved location</Text>
+          </PressableScale>
+        ) : null}
+        {weatherMessage ? (
+          <Text style={styles.reminderMessage}>{weatherMessage}</Text>
         ) : null}
       </Card>
 
@@ -287,6 +427,16 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     lineHeight: 18,
     marginTop: theme.spacing.xs
+  },
+  inlineLink: {
+    alignSelf: "flex-start",
+    minHeight: 32,
+    justifyContent: "center"
+  },
+  inlineLinkText: {
+    color: theme.colors.terra,
+    fontFamily: theme.typography.fontFamily.bodyBold,
+    fontSize: theme.typography.caption
   },
   linkRow: {
     alignItems: "center",

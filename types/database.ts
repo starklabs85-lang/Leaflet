@@ -213,6 +213,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      subscriptions: {
+        Row: {
+          created_at: string;
+          entitlement: string | null;
+          expires_at: string | null;
+          id: string;
+          plan: "free" | "premium";
+          platform: "ios" | "android" | null;
+          rc_app_user_id: string | null;
+          store_transaction_id: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          entitlement?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          plan?: "free" | "premium";
+          platform?: "ios" | "android" | null;
+          rc_app_user_id?: string | null;
+          store_transaction_id?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          entitlement?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          plan?: "free" | "premium";
+          platform?: "ios" | "android" | null;
+          rc_app_user_id?: string | null;
+          store_transaction_id?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       species: {
         Row: {
           care_profile: Json;
@@ -251,9 +290,11 @@ export type Database = {
           created_at: string;
           date_added: string;
           id: string;
+          light_exposure: "low" | "medium" | "bright" | "unknown";
           location: string | null;
           nickname: string | null;
           photo_url: string | null;
+          placement: "indoor" | "outdoor" | "balcony" | "unknown";
           species_id: string | null;
           status: "healthy" | "needs_attention" | "sick";
           updated_at: string;
@@ -263,9 +304,11 @@ export type Database = {
           created_at?: string;
           date_added?: string;
           id?: string;
+          light_exposure?: "low" | "medium" | "bright" | "unknown";
           location?: string | null;
           nickname?: string | null;
           photo_url?: string | null;
+          placement?: "indoor" | "outdoor" | "balcony" | "unknown";
           species_id?: string | null;
           status?: "healthy" | "needs_attention" | "sick";
           updated_at?: string;
@@ -275,9 +318,11 @@ export type Database = {
           created_at?: string;
           date_added?: string;
           id?: string;
+          light_exposure?: "low" | "medium" | "bright" | "unknown";
           location?: string | null;
           nickname?: string | null;
           photo_url?: string | null;
+          placement?: "indoor" | "outdoor" | "balcony" | "unknown";
           species_id?: string | null;
           status?: "healthy" | "needs_attention" | "sick";
           updated_at?: string;
@@ -298,7 +343,13 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      get_daily_scan_usage: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          identify_count: number;
+          diagnose_count: number;
+        }[];
+      };
     };
     Enums: {
       [_ in never]: never;

@@ -7,6 +7,8 @@ import { getSupabaseClient } from "@/lib/supabase";
 import type {
   CollectionResult,
   CollectionSpeciesSummary,
+  LightExposure,
+  PlantPlacement,
   PlantStatus,
   SavePlantInput,
   SavedPlant,
@@ -19,6 +21,8 @@ type PlantRowWithSpecies = {
   species_id: string | null;
   nickname: string | null;
   location: string | null;
+  placement: PlantPlacement;
+  light_exposure: LightExposure;
   status: PlantStatus;
   photo_url: string | null;
   date_added: string;
@@ -57,6 +61,8 @@ function toSavedPlant(row: PlantRowWithSpecies): SavedPlant {
     nickname: row.nickname,
     displayName: row.nickname?.trim() || row.species?.common_name || "Plant",
     location: row.location,
+    placement: row.placement,
+    lightExposure: row.light_exposure,
     status: row.status,
     photoUrl: row.photo_url,
     dateAdded: row.date_added,
@@ -137,7 +143,7 @@ export async function listUserPlants(): Promise<CollectionResult<SavedPlant[]>> 
   const { data, error } = await getSupabaseClient()
     .from("user_plants")
     .select(
-      "id, user_id, species_id, nickname, location, status, photo_url, date_added, species:species_id(id, common_name, scientific_name, image_url)"
+      "id, user_id, species_id, nickname, location, placement, light_exposure, status, photo_url, date_added, species:species_id(id, common_name, scientific_name, image_url)"
     )
     .eq("user_id", userResult.user.id)
     .order("date_added", { ascending: false })
@@ -183,7 +189,7 @@ export async function fetchUserPlant(
   const { data, error } = await getSupabaseClient()
     .from("user_plants")
     .select(
-      "id, user_id, species_id, nickname, location, status, photo_url, date_added, species:species_id(id, common_name, scientific_name, image_url)"
+      "id, user_id, species_id, nickname, location, placement, light_exposure, status, photo_url, date_added, species:species_id(id, common_name, scientific_name, image_url)"
     )
     .eq("id", normalizedPlantId)
     .eq("user_id", userResult.user.id)
@@ -249,11 +255,13 @@ export async function createUserPlant(
         species_id: input.speciesId,
         nickname,
         location,
+        placement: input.placement,
+        light_exposure: input.lightExposure,
         status: input.status,
         photo_url: uploadedPhotoUrl
       })
       .select(
-        "id, user_id, species_id, nickname, location, status, photo_url, date_added, species:species_id(id, common_name, scientific_name, image_url)"
+        "id, user_id, species_id, nickname, location, placement, light_exposure, status, photo_url, date_added, species:species_id(id, common_name, scientific_name, image_url)"
       )
       .single()
       .returns<PlantRowWithSpecies>();
@@ -326,13 +334,15 @@ export async function updateUserPlant(
       .update({
         nickname: normalizeOptionalText(input.nickname),
         location: normalizeOptionalText(input.location),
+        placement: input.placement,
+        light_exposure: input.lightExposure,
         status: input.status,
         ...(uploadedPhotoUrl ? { photo_url: uploadedPhotoUrl } : {})
       })
       .eq("id", input.plantId)
       .eq("user_id", userResult.user.id)
       .select(
-        "id, user_id, species_id, nickname, location, status, photo_url, date_added, species:species_id(id, common_name, scientific_name, image_url)"
+        "id, user_id, species_id, nickname, location, placement, light_exposure, status, photo_url, date_added, species:species_id(id, common_name, scientific_name, image_url)"
       )
       .maybeSingle()
       .returns<PlantRowWithSpecies | null>();

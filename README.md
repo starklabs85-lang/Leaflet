@@ -27,6 +27,7 @@ Implemented in app code:
 - Central auth provider for Supabase session state.
 - Session restore on launch.
 - Auth route gating for public and authenticated route groups.
+- Supabase email/password sign-up and sign-in.
 - Native Apple and Google ID-token sign-in flow wiring.
 - Profile sign-out action.
 - EAS development-build configuration for native provider testing.
@@ -35,9 +36,10 @@ Still required outside app code:
 
 - Supabase Auth Apple provider configuration.
 - Supabase Auth Google provider configuration.
+- Supabase Auth email confirmation policy review for the hosted project.
 - Apple Developer Sign in with Apple capability for `com.countrybean.leaflet`.
 - Google Cloud OAuth clients and iOS URL scheme.
-- Native development build verification that both providers create users in Supabase Auth.
+- Native development build verification that email/password, Apple, and Google create or restore Supabase Auth sessions.
 
 ## Phase 03 scope
 
@@ -119,6 +121,10 @@ npm run build:dev:android
 - Missing Supabase environment variables show a readable setup message.
 - With valid Supabase values, `supabase.auth.getSession()` returns without throwing.
 
+## Auth notes
+
+Leaflet supports Supabase email/password auth alongside Apple and Google. Hosted Supabase projects commonly require email confirmation unless confirmation is disabled in the Supabase dashboard; the app handles either outcome by routing immediately when a session is returned or keeping the user on sign-in with a confirmation message.
+
 ## Next phase
 
-Finish the manual Phase 02/03 verification items: configure Apple/Google provider dashboards, create a development build, verify real sign-in creates Supabase Auth users, apply the Phase 03 migration to the target Supabase project, deploy the `identify-plant` Edge Function, and run the RLS/storage checks with real authenticated sessions. Phase 04 should reuse the existing `identify-plant` function instead of adding another scan endpoint.
+Finish the manual Phase 02/03 verification items: configure Apple/Google provider dashboards, review email confirmation settings, create a development build, verify real sign-in creates Supabase Auth users, apply the Phase 03 migration to the target Supabase project, deploy the `identify-plant` Edge Function, and run the RLS/storage checks with real authenticated sessions. Phase 04 should reuse the existing `identify-plant` function instead of adding another scan endpoint.

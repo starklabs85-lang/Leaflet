@@ -1,11 +1,12 @@
 # Phase 02 Auth Provider Setup
 
-Phase 02 uses native Apple and Google identity tokens and exchanges them with Supabase Auth via `signInWithIdToken`.
+Phase 02 supports Supabase email/password auth plus native Apple and Google identity tokens exchanged with Supabase Auth via `signInWithIdToken`.
 
 ## Supabase
 
-Enable these providers in the Supabase dashboard:
+Enable or review these providers in the Supabase dashboard:
 
+- Email
 - Apple
 - Google
 
@@ -16,6 +17,19 @@ leaflet://
 ```
 
 The Expo app must only use the public Supabase URL and anon key. Keep service-role keys and provider secrets in dashboards or operator-managed config only.
+
+Hosted Supabase projects commonly require email confirmation for new email/password users unless confirmation is disabled in the dashboard. Leaflet supports both settings: confirmation-disabled sign-up returns a session and routes into the app, while confirmation-enabled sign-up leaves the user on sign-in with a check-your-email message.
+
+## Email/password
+
+Email/password sign-up and sign-in use the existing public Supabase URL and anon key. No additional Expo environment variables are required.
+
+Before release, verify:
+
+- New email/password account creation is allowed for the project.
+- The email confirmation setting matches the launch policy.
+- Confirmation email templates and SMTP settings are production-ready if confirmation stays enabled.
+- Existing OAuth users can still use Apple or Google without changing their sign-in path.
 
 ## Apple
 
@@ -60,7 +74,9 @@ Native Apple and Google modules require a development build. Expo Go is not enou
 Phase 02 is not complete until all of these are true:
 
 - `.env` contains the Supabase and Google public client values.
+- Supabase Auth allows email/password sign-up and sign-in.
 - Supabase Auth has Apple and Google enabled.
+- Email confirmation behavior has been verified for the hosted project.
 - Apple Developer has Sign in with Apple enabled for `com.countrybean.leaflet`.
 - Google Cloud OAuth has clients matching the app bundle/package identifiers.
 - A native development build signs in with both providers and shows new users in Supabase Auth.
@@ -91,6 +107,8 @@ Use this checklist before starting Phase 03:
 - `npm run start` starts Metro without config errors.
 - Development build installs on the target device or simulator.
 - Signed-out launch lands on the public sign-in screen.
+- Email/password sign-up either creates a session or shows a confirmation-required message, depending on Supabase settings.
+- Email/password sign-in restores a valid existing user session.
 - Apple sign-in completes and creates a user in Supabase Auth.
 - Google sign-in completes and creates a user in Supabase Auth.
 - Relaunch restores the Supabase session.

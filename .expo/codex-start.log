@@ -1,0 +1,10 @@
+
+> leaflet@0.1.0 start
+> expo start --dev-client --lan --port 8081
+
+env: load .env
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME
+Starting project at F:\Projects\Intern Assignments\CountryBean\leaflet
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.

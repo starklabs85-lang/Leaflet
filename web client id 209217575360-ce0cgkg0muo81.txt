@@ -1,0 +1,4 @@
+web client id 209217575360-ce0cgkg0muo81h01rmno3fv24lv9qb3h.apps.googleusercontent.com
+web client secret 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
+
+ios 209217575360-ubdbgfv1ns77j43tc2pfbbs24jvmf8ng.apps.googleusercontent.com

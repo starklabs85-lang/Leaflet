@@ -1,5 +1,11 @@
 export type PlantStatus = "healthy" | "needs_attention" | "sick";
 
+// Structured environment signals read by the weather tip engine.
+// "unknown" is treated as indoor (the safe default).
+export type PlantPlacement = "indoor" | "outdoor" | "balcony" | "unknown";
+
+export type LightExposure = "low" | "medium" | "bright" | "unknown";
+
 export type CollectionSpeciesSummary = {
   id: string;
   commonName: string;
@@ -14,6 +20,8 @@ export type SavedPlant = {
   nickname: string | null;
   displayName: string;
   location: string | null;
+  placement: PlantPlacement;
+  lightExposure: LightExposure;
   status: PlantStatus;
   photoUrl: string | null;
   dateAdded: string;
@@ -25,6 +33,8 @@ export type SavePlantInput = {
   nickname: string;
   fallbackName: string;
   location: string | null;
+  placement: PlantPlacement;
+  lightExposure: LightExposure;
   status: PlantStatus;
   photoUri?: string | null;
 };
@@ -33,6 +43,8 @@ export type UpdatePlantInput = {
   plantId: string;
   nickname: string | null;
   location: string | null;
+  placement: PlantPlacement;
+  lightExposure: LightExposure;
   status: PlantStatus;
   photoUri?: string | null;
 };

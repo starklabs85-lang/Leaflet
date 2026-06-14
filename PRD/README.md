@@ -32,6 +32,16 @@ Ship after MVP is live and the core loop is validated.
 | 11 | [Growth Timeline & Streaks](phase-11-growth-streaks.md) | Photo timeline per plant + gamified care streaks |
 | 12 | [Monetization](phase-12-monetization.md) | Generous free tier + non-intrusive premium subscription |
 
+## Feature Phases (13–14)
+
+New capabilities layered on the live app. Independent of each other.
+
+| # | Phase | Goal |
+|---|-------|------|
+| 13 | [RevenueCat Payments](phase-13-revenuecat-payments.md) | Implement Phase 12's premium tier via RevenueCat (entitlements, restore, webhooks) |
+| 14 | [Weather-Aware Care Tips](phase-14-weather-aware-care.md) | Location + weather-aware care tips replacing generic guidance (free for all users) |
+| 15 | [Advanced Analytics](phase-15-advanced-analytics.md) | Premium-only deep care analytics (per-plant/per-type trends, ranges, health over time) — first depth feature behind the paywall |
+
 ---
 
 ## How to use these docs

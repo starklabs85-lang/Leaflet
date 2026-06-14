@@ -58,7 +58,7 @@ export type CareReminderResult =
       settings: CareReminderSettings;
     };
 
-const CARE_REMINDER_CHANNEL_ID = "care-reminders";
+export const CARE_REMINDER_CHANNEL_ID = "care-reminders";
 // SecureStore rejects ":" in keys; namespaces use "." (alphanumeric, ".", "-", "_" only).
 const ENABLED_KEY = "leaflet.care-reminders-enabled";
 const PROMPT_SEEN_KEY = "leaflet.care-reminders-prompt-seen";
@@ -612,6 +612,21 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
   }
 
   const data = response.notification.request.content.data as ReminderPayload;
+
+  if (data.kind === "weather_alert") {
+    lastHandledNotificationId = notificationId;
+
+    if (typeof data.userPlantId === "string" && data.userPlantId) {
+      router.push({
+        pathname: "/(auth)/plants/[plantId]" as never,
+        params: { plantId: data.userPlantId }
+      });
+    } else {
+      router.push("/(auth)/(tabs)/home" as never);
+    }
+
+    return;
+  }
 
   if (!isCareReminderPayload(data)) {
     return;

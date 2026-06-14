@@ -91,6 +91,7 @@ export type IdentifyPlantErrorResponse = {
     code:
       | "function_error"
       | "empty_response"
+      | "free_limit_reached"
       | "invalid_json"
       | "invalid_request"
       | "missing_openai_key"
@@ -101,6 +102,8 @@ export type IdentifyPlantErrorResponse = {
       | "validation_failed";
     message: string;
     retryAfterSeconds?: number;
+    scanType?: "identify" | "diagnose";
+    limit?: number;
   };
 };
 

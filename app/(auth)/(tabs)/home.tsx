@@ -25,6 +25,7 @@ import { IconChip } from "@/components/ui/IconChip";
 import { PlantImage } from "@/components/ui/PlantImage";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { Screen } from "@/components/ui/Screen";
+import { TodayNearYou } from "@/components/weather/TodayNearYou";
 import { fetchDashboardData } from "@/lib/api/dashboard";
 import { formatCareType, quickLogCare } from "@/lib/api/careSchedule";
 import {
@@ -213,6 +214,10 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
+      <TodayNearYou
+        hasPlants={data.totalPlants > 0}
+        onCareTaskAdjusted={() => loadDashboard(true)}
+      />
       <HealthSummary data={data} />
       <CareMomentumCard data={data} />
       <TodayTasksSection
