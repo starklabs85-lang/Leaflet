@@ -1,6 +1,6 @@
 # Phase 10 Launch Readiness Notes
 
-Phase 10 is app-code stabilization around the existing MVP loop. No Supabase schema migration or Edge Function deployment is part of this phase.
+Phase 10 is release stabilization around the existing production care loop. No Supabase schema migration or Edge Function deployment is part of this checklist.
 
 ## App Store Listing Draft
 
@@ -13,7 +13,7 @@ Phase 10 is app-code stabilization around the existing MVP loop. No Supabase sch
 **Description:**
 Leaflet helps houseplant owners move from "What plant is this?" to "What do I do next?" Scan a plant, review AI-assisted identification, save it to your collection, and keep care tasks visible on your dashboard. For sick plants, diagnosis mode can review a photo and provide practical care guidance with a clear advisory disclaimer.
 
-Leaflet is built for beta testing and MVP validation. AI results can be imperfect, so always review recommendations before acting.
+Leaflet is built for public release. AI results can be imperfect, so always review recommendations before acting.
 
 **Keywords:** plant care, houseplants, plant identification, watering reminder, plant health, plant diagnosis, garden, indoor plants
 
@@ -21,7 +21,7 @@ Leaflet is built for beta testing and MVP validation. AI results can be imperfec
 
 ## Screenshot Plan
 
-Capture 3-5 production-like screenshots after a physical-device build is stable:
+Capture 3-5 App Store screenshots after a physical-device build is stable:
 
 1. Onboarding welcome or first scan prompt.
 2. Scan camera or scan processing state with consent copy visible.
@@ -39,11 +39,11 @@ Leaflet should disclose:
 - **Identifiers:** Supabase Auth user ID and provider account identifier/email where provided by Apple or Google.
 - **Diagnostics:** app crash/build diagnostics only if Expo/EAS or App Store Connect collection is enabled.
 - **Data linked to user:** account identifiers, plant collection data, uploaded photos, care and diagnosis records.
-- **Tracking:** no cross-app tracking in the MVP.
+- **Tracking:** no cross-app tracking.
 - **Data sale:** no user data sold to third parties.
 - **Third-party processing:** scan and diagnosis photos are processed through Supabase and OpenAI.
 
-## TestFlight Validation Checklist
+## TestFlight And Release Validation Checklist
 
 - Fresh install opens onboarding.
 - Quick intent selection stores locally and advances to sign-in.

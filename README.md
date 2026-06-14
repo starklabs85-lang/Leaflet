@@ -1,74 +1,36 @@
 # Leaflet
 
-Leaflet is an Expo Router app scaffold for the plant-care product described in `PRD/`.
+Leaflet is an iOS-first plant-care app built with Expo Router, Supabase, OpenAI, and RevenueCat. It helps houseplant owners identify plants, save a collection, track care, review plant-health guidance, manage reminders, unlock premium features, and receive weather-aware care tips.
 
-This repository currently implements the Phase 01 foundation, the Phase 02 app-side authentication shell, and the Phase 03 backend foundation files. Provider dashboard setup, native development-build verification, and Supabase project access are required before the remote Phase 03 deployment can be fully verified.
+## Product Surface
 
-## Phase 01 scope
+- Account access with Supabase email/password auth plus Apple and Google sign-in.
+- First-run onboarding that moves new users into sign-in and their first scan.
+- Plant scanning through the `identify-plant` Supabase Edge Function with OpenAI-powered identification.
+- Species profiles with care guidance, toxicity notes, images, and scan alternates.
+- A saved plant collection with editable nicknames, locations, placement details, and photos.
+- Care schedules, quick logs, history, local reminder notifications, and care streaks.
+- Diagnosis flows for plant-health photos with visible AI safety disclaimers.
+- Premium entitlements through RevenueCat, including restore support and webhook-backed sync.
+- Weather-aware care cards and alerts using coarse location or manual city input.
 
-Implemented:
+## Stack
 
-- Expo SDK 54 TypeScript project shell.
-- Expo Router entrypoint with public and authenticated route groups.
-- Authenticated tab shell with Home, Scan, My Plants, and Profile placeholders.
-- Supabase client module using public Expo environment variables and SecureStore-backed auth persistence.
-- Leaflet theme tokens in `constants/theme.ts`.
-- Placeholder folders for shared components, hooks, app types, and assets.
-
-Not implemented yet:
-
-- Camera capture or plant scanning.
-- Plant collection, care scheduling, diagnosis, notifications, onboarding, or monetization.
-
-## Phase 02 scope
-
-Implemented in app code:
-
-- Central auth provider for Supabase session state.
-- Session restore on launch.
-- Auth route gating for public and authenticated route groups.
-- Supabase email/password sign-up and sign-in.
-- Native Apple and Google ID-token sign-in flow wiring.
-- Profile sign-out action.
-- EAS development-build configuration for native provider testing.
-
-Still required outside app code:
-
-- Supabase Auth Apple provider configuration.
-- Supabase Auth Google provider configuration.
-- Supabase Auth email confirmation policy review for the hosted project.
-- Apple Developer Sign in with Apple capability for `com.countrybean.leaflet`.
-- Google Cloud OAuth clients and iOS URL scheme.
-- Native development build verification that email/password, Apple, and Google create or restore Supabase Auth sessions.
-
-## Phase 03 scope
-
-Implemented in repo files:
-
-- Versioned Supabase migration for `species`, `user_plants`, `care_tasks`, `care_logs`, `diagnoses`, and `scan_cache`.
-- Constraints, foreign keys, timestamps, indexes, table grants, and RLS policies for Phase 03 data access.
-- `plant-photos` and `scan-uploads` Storage bucket definitions plus user-folder policies.
-- `identify-plant` Edge Function scaffold with CORS, JWT/user validation, request validation, and a placeholder response.
-- App-side database types in `types/database.ts`.
-- Thin future-facing function wrapper in `lib/api/identifyPlant.ts`.
-
-Still required outside repo files:
-
-- Supabase MCP or dashboard access to project `gnrjqqoidzuwzvhhfggh`.
-- Applying `supabase/migrations/20260530163230_phase_03_database_backend.sql` to the target project.
-- Deploying `supabase/functions/identify-plant/index.ts` with JWT verification enabled.
-- Setting the `OPENAI_API_KEY` Edge Function secret in Supabase secret management.
-- Creating real authenticated test users and verifying RLS/storage behavior with their sessions.
+- Expo SDK 54, Expo Router, React Native, TypeScript
+- Supabase Auth, Postgres, Storage, and Edge Functions
+- OpenAI vision/text models behind Supabase Edge Functions
+- RevenueCat for subscription entitlements
+- EAS for native iOS builds
 
 ## Environment
 
-Copy `.env.example` to `.env` and fill in the public Supabase values from your Supabase project:
+Copy `.env.example` to `.env` and fill in the public values used by the Expo client:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Required variables:
+Required public variables:
 
 ```text
 EXPO_PUBLIC_SUPABASE_URL=
@@ -76,11 +38,32 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=
 EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=
+EXPO_PUBLIC_REVENUECAT_IOS_KEY=
 ```
 
-Only use the public anon key in the Expo app. Do not put service-role keys, OpenAI keys, Apple secrets, or Google secrets in this repository.
+Secondary Android support uses:
 
-## Run commands
+```text
+EXPO_PUBLIC_REVENUECAT_ANDROID_KEY=
+```
+
+Development-only email/password helpers are available through:
+
+```text
+EXPO_PUBLIC_DEV_TEST_EMAIL=
+EXPO_PUBLIC_DEV_TEST_PASSWORD=
+```
+
+Only use public client keys in Expo environment variables. Keep service-role keys, OpenAI keys, Apple secrets, Google secrets, and RevenueCat webhook secrets in the relevant provider dashboards or Supabase secret management.
+
+Server-side secrets required by the deployed Supabase functions include:
+
+```text
+OPENAI_API_KEY
+REVENUECAT_WEBHOOK_SECRET
+```
+
+## Local Setup
 
 Install dependencies:
 
@@ -100,31 +83,46 @@ Run TypeScript validation:
 npm run typecheck
 ```
 
-Create a native development build for Phase 02 provider testing:
+## Production Build
+
+Leaflet's primary release target is iOS. Confirm the external setup in `docs/phase-10-launch-blockers.md`, then create a production iOS build:
+
+```powershell
+eas build --platform ios --profile production
+```
+
+Use a development client for physical-device provider QA before submitting to App Store Connect:
 
 ```powershell
 npm run build:dev:ios
 ```
 
-For Android Google sign-in testing:
+Android remains secondary and is available for Google sign-in and RevenueCat checks:
 
 ```powershell
 npm run build:dev:android
 ```
 
-## Phase 01 verification checklist
+## External Setup
 
-- Expo starts without a blank screen.
-- The app opens to the Phase 01 shell.
-- The four tabs render: Home, Scan, My Plants, Profile.
-- The Profile tab displays the Supabase configuration/session check message.
-- Missing Supabase environment variables show a readable setup message.
-- With valid Supabase values, `supabase.auth.getSession()` returns without throwing.
+- Configure Supabase Auth for email/password, Apple, and Google providers.
+- Apply the Supabase migrations in `supabase/migrations`.
+- Deploy the `identify-plant`, `weather-tips`, and `revenuecat-webhook` Edge Functions.
+- Set required Supabase Edge Function secrets for OpenAI and RevenueCat.
+- Configure Apple Developer and Google Cloud OAuth settings for bundle ID `com.countrybean.leaflet`.
+- Configure RevenueCat offerings, entitlements, products, App Store credentials, and webhook delivery.
 
-## Auth notes
+Detailed provider guidance lives in `docs/auth-provider-setup.md` and launch setup blockers live in `docs/phase-10-launch-blockers.md`.
 
-Leaflet supports Supabase email/password auth alongside Apple and Google. Hosted Supabase projects commonly require email confirmation unless confirmation is disabled in the Supabase dashboard; the app handles either outcome by routing immediately when a session is returned or keeping the user on sign-in with a confirmation message.
+## Release Verification
 
-## Next phase
-
-Finish the manual Phase 02/03 verification items: configure Apple/Google provider dashboards, review email confirmation settings, create a development build, verify real sign-in creates Supabase Auth users, apply the Phase 03 migration to the target Supabase project, deploy the `identify-plant` Edge Function, and run the RLS/storage checks with real authenticated sessions. Phase 04 should reuse the existing `identify-plant` function instead of adding another scan endpoint.
+- `npm run typecheck` passes.
+- Fresh install opens onboarding and reaches sign-in.
+- Email/password, Apple, and Google sign-in create or restore the expected Supabase user.
+- A signed-in iPhone can scan, identify, save a plant, view species details, and return to the dashboard.
+- Care tasks can be logged, reminder permission can be requested, and notification-tap routing is checked on device.
+- Diagnosis results and saved diagnosis history show AI advisory copy.
+- Weather-aware tips work with coarse location or manual city input.
+- Premium purchase, restore, entitlement refresh, and RevenueCat webhook sync are verified with App Store sandbox tooling.
+- Privacy Policy and Terms are reachable from sign-in and Profile.
+- App Store screenshots, privacy labels, age rating, and support/legal URLs are ready in App Store Connect.

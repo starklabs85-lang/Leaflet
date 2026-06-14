@@ -44,7 +44,7 @@ export default function FirstScanPromptScreen() {
       <Text style={styles.eyebrow}>Step 4 of 5</Text>
       <Text style={styles.title}>Let's scan your first plant!</Text>
       <Text style={styles.body}>
-        Point your camera at a houseplant — Leaflet will identify it and build a
+        Point your camera at a houseplant - Leaflet will identify it and build a
         care plan from the result.
       </Text>
 

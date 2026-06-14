@@ -24,12 +24,12 @@ export const PRIVACY_POLICY_SECTIONS = [
   {
     title: "User control and deletion",
     body:
-      "You can delete plants from your collection in the app. For account deletion or complete data removal during beta, contact the app owner with the email tied to your Supabase account."
+      "You can delete plants from your collection in the app. For account deletion or complete data removal, contact the app owner with the email tied to your Leaflet account."
   },
   {
-    title: "Beta limitations",
+    title: "AI limitations",
     body:
-      "Leaflet is an MVP beta. Plant identification and diagnosis output can be wrong, and diagnosis guidance is informational only. For serious plant, pet, or human safety concerns, consult a qualified expert."
+      "Leaflet is a production plant-care service, but plant identification and diagnosis output can still be wrong. Diagnosis guidance is informational only. For serious plant, pet, or human safety concerns, consult a qualified expert."
   }
 ] as const;
 
@@ -42,7 +42,7 @@ export const TERMS_SECTIONS = [
   {
     title: "Accounts and access",
     body:
-      "You must use a supported Apple or Google sign-in method. Keep your account secure and only upload photos and plant records that you have the right to use."
+      "You must use a supported sign-in method. Keep your account secure and only upload photos and plant records that you have the right to use."
   },
   {
     title: "AI and diagnosis disclaimer",
@@ -55,8 +55,8 @@ export const TERMS_SECTIONS = [
       "Do not upload illegal, harmful, private, or non-plant content. Do not attempt to bypass rate limits, access another user's data, or interfere with Leaflet's Supabase backend."
   },
   {
-    title: "Beta changes",
+    title: "Service changes",
     body:
-      "Features, data model, and availability may change during TestFlight and beta testing. Leaflet is provided as-is while the MVP is being validated."
+      "Features, data model, and availability may change as Leaflet improves. Leaflet is provided as-is as a plant-care information service."
   }
 ] as const;
