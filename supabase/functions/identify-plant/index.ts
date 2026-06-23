@@ -113,6 +113,14 @@ type PlantDiagnosisResult = {
 
 const MAX_IMAGE_BASE64_LENGTH = 12_000_000;
 const MAX_SCANS_PER_HOUR = 10;
+// Premium is "unlimited" product-wise; this is purely an anti-abuse backstop
+// (each scan costs an OpenAI call).
+const MAX_PREMIUM_SCANS_PER_HOUR = 30;
+// Phase 12 free-tier daily caps, counted per scan type over the current UTC day.
+const FREE_DAILY_LIMITS: Record<ScanType, number> = {
+  identify: 5,
+  diagnose: 3
+};
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o";
 
 const corsHeaders = {
@@ -551,6 +559,23 @@ async function callOpenAI({
   }
 }
 
+async function getIsPremium(
+  adminClient: ReturnType<typeof createClient>,
+  userId: string
+) {
+  const { data } = await adminClient
+    .from("subscriptions")
+    .select("plan, expires_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!data || data.plan !== "premium") {
+    return false;
+  }
+
+  return !data.expires_at || new Date(data.expires_at as string) > new Date();
+}
+
 async function upsertSpecies(
   adminClient: ReturnType<typeof createClient>,
   result: IdentifyPlantResult
@@ -704,6 +729,7 @@ Deno.serve(async (req) => {
   }
 
   const imageHash = await sha256(validation.value.imageBase64);
+  const isPremium = await getIsPremium(adminClient, user.id);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
   const { count } = await adminClient
@@ -712,7 +738,9 @@ Deno.serve(async (req) => {
     .eq("user_id", user.id)
     .gte("created_at", oneHourAgo);
 
-  if ((count ?? 0) >= MAX_SCANS_PER_HOUR) {
+  const hourlyCap = isPremium ? MAX_PREMIUM_SCANS_PER_HOUR : MAX_SCANS_PER_HOUR;
+
+  if ((count ?? 0) >= hourlyCap) {
     return jsonResponse(
       {
         ok: false,
@@ -724,6 +752,39 @@ Deno.serve(async (req) => {
       },
       429
     );
+  }
+
+  if (!isPremium) {
+    const dailyLimit = FREE_DAILY_LIMITS[validation.value.scanType];
+    const utcDayStart = new Date();
+    utcDayStart.setUTCHours(0, 0, 0, 0);
+
+    const { count: dailyCount } = await adminClient
+      .from("scan_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("scan_type", validation.value.scanType)
+      .gte("created_at", utcDayStart.toISOString());
+
+    if ((dailyCount ?? 0) >= dailyLimit) {
+      const noun =
+        validation.value.scanType === "identify"
+          ? "identify scans"
+          : "diagnosis scans";
+
+      return jsonResponse(
+        {
+          ok: false,
+          error: {
+            code: "free_limit_reached",
+            message: `You've used your ${dailyLimit} free ${noun} today. Upgrade to Premium for unlimited scans.`,
+            scanType: validation.value.scanType,
+            limit: dailyLimit
+          }
+        },
+        429
+      );
+    }
   }
 
   const { data: cached } = await adminClient

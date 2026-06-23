@@ -14,6 +14,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { UpgradePrompt } from "@/components/payments/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { IconChip } from "@/components/ui/IconChip";
 import { PlantImage } from "@/components/ui/PlantImage";
@@ -26,13 +27,25 @@ import {
   fetchSpeciesForSave
 } from "@/lib/api/plantCollection";
 import {
+  checkCollectionAllowance,
+  getCollectionCount
+} from "@/lib/payments/limits";
+import {
+  markTrialIntroSeen,
+  shouldShowTrialIntro
+} from "@/lib/payments/trialIntro";
+import { useEntitlement } from "@/providers/EntitlementProvider";
+import {
   markCareReminderPromptSeen,
   requestAndEnableCareReminders,
   shouldPromptForCareReminders
 } from "@/lib/notifications/careReminders";
+import { PlantEnvironmentFields } from "@/components/plants/PlantEnvironmentFields";
 import { useOnboarding } from "@/providers/OnboardingProvider";
 import type {
   CollectionSpeciesSummary,
+  LightExposure,
+  PlantPlacement,
   PlantStatus
 } from "@/types/plantCollection";
 
@@ -70,10 +83,14 @@ export default function SavePlantScreen() {
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
   const [nickname, setNickname] = useState("");
   const [location, setLocation] = useState("");
+  const [placement, setPlacement] = useState<PlantPlacement>("unknown");
+  const [lightExposure, setLightExposure] = useState<LightExposure>("unknown");
   const [status, setStatus] = useState<PlantStatus>("healthy");
   const [photoUri, setPhotoUri] = useState<string | null>(sourcePhotoUri ?? null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const { isPremium } = useEntitlement();
 
   useEffect(() => {
     let isMounted = true;
@@ -164,6 +181,16 @@ export default function SavePlantScreen() {
 
     setIsSaving(true);
     setMessage(null);
+    setLimitMessage(null);
+
+    // Free accounts track up to 10 plants; existing plants stay fully usable.
+    const allowance = await checkCollectionAllowance(isPremium);
+
+    if (!allowance.allowed) {
+      setIsSaving(false);
+      setLimitMessage(allowance.message);
+      return;
+    }
 
     let preparedSourcePhoto: string | null = photoUri;
 
@@ -181,6 +208,8 @@ export default function SavePlantScreen() {
       nickname: nickname.trim(),
       fallbackName: loadState.species.commonName,
       location: location.trim(),
+      placement,
+      lightExposure,
       status,
       photoUri: preparedSourcePhoto
     });
@@ -192,21 +221,51 @@ export default function SavePlantScreen() {
       return;
     }
 
+    // One-time trial intro after the very first plant (Phase 12/13): shown as
+    // a celebration, dismissible, and never auto-shown again.
+    let showTrialIntro = false;
+
     try {
-      const shouldShowActivation = await onboarding.completeAfterPlantSave({
+      const [collectionCount, introUnseen] = await Promise.all([
+        getCollectionCount(),
+        shouldShowTrialIntro()
+      ]);
+
+      showTrialIntro = collectionCount === 1 && introUnseen && !isPremium;
+    } catch {
+      showTrialIntro = false;
+    }
+
+    let shouldShowActivation = false;
+
+    try {
+      shouldShowActivation = await onboarding.completeAfterPlantSave({
         plantId: result.data.id,
         plantName: result.data.displayName,
         waterInDays: await getWaterPreviewDays(result.data.id)
       });
-
-      if (shouldShowActivation) {
-        router.replace("/(auth)/onboarding/activation" as never);
-        return;
-      }
     } catch {
       setMessage(
         "Plant saved. Onboarding status could not be updated on this device."
       );
+    }
+
+    if (showTrialIntro) {
+      await markTrialIntroSeen();
+      router.replace({
+        pathname: "/(auth)/premium-intro" as never,
+        params: {
+          next: shouldShowActivation ? "activation" : "plant",
+          plantId: result.data.id,
+          plantName: result.data.displayName
+        }
+      });
+      return;
+    }
+
+    if (shouldShowActivation) {
+      router.replace("/(auth)/onboarding/activation" as never);
+      return;
     }
 
     const openPlant = () =>
@@ -438,6 +497,13 @@ export default function SavePlantScreen() {
           ) : null}
         </View>
 
+        <PlantEnvironmentFields
+          lightExposure={lightExposure}
+          onChangeLightExposure={setLightExposure}
+          onChangePlacement={setPlacement}
+          placement={placement}
+        />
+
         <Text style={styles.label}>Status</Text>
         <View style={styles.statusRow}>
           <StatusOption
@@ -457,6 +523,14 @@ export default function SavePlantScreen() {
           />
         </View>
 
+        {limitMessage ? (
+          <UpgradePrompt
+            message={limitMessage}
+            onDismiss={() => setLimitMessage(null)}
+            style={styles.limitPrompt}
+            title="Collection limit reached"
+          />
+        ) : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
       </Screen>
     </KeyboardAvoidingView>
@@ -697,6 +771,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bodyBold,
     fontSize: theme.typography.body,
     lineHeight: 24,
+    marginTop: theme.spacing.lg
+  },
+  limitPrompt: {
     marginTop: theme.spacing.lg
   },
   actionBar: {

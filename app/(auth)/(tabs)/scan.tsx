@@ -16,6 +16,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 
 import { ScanFrame } from "@/components/illustrations/ScanFrame";
+import { UpgradePrompt } from "@/components/payments/UpgradePrompt";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -28,6 +29,11 @@ import {
 } from "@/lib/api/diagnosis";
 import { identifyPlant } from "@/lib/api/identifyPlant";
 import { createDiagnosisDraft } from "@/lib/diagnosisDraftStore";
+import {
+  checkDiagnoseScanAllowance,
+  checkIdentifyScanAllowance
+} from "@/lib/payments/limits";
+import { useEntitlement } from "@/providers/EntitlementProvider";
 import type {
   IdentifyPlantResult,
   PlantIdentificationCandidate,
@@ -40,7 +46,7 @@ type CapturedPhoto = {
   height?: number;
 };
 
-type ScanStep = "camera" | "preview" | "loading" | "result" | "error";
+type ScanStep = "camera" | "preview" | "loading" | "result" | "error" | "limit";
 type ScanMode = "identify" | "diagnose";
 
 const MAX_IMAGE_EDGE = 1024;
@@ -64,6 +70,8 @@ export default function ScanScreen() {
     null
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const { isPremium } = useEntitlement();
 
   useEffect(() => {
     const nextMode = getInitialMode(params.mode);
@@ -181,8 +189,22 @@ export default function ScanScreen() {
 
     setStep("loading");
     setErrorMessage(null);
+    setLimitMessage(null);
     setResult(null);
     setSelectedAlternateIndex(null);
+
+    // Friendly pre-check; the identify-plant function enforces the same caps
+    // server-side, so this only exists to avoid a wasted upload.
+    const allowance =
+      mode === "identify"
+        ? await checkIdentifyScanAllowance(isPremium)
+        : await checkDiagnoseScanAllowance(isPremium);
+
+    if (!allowance.allowed) {
+      setLimitMessage(allowance.message);
+      setStep("limit");
+      return;
+    }
 
     try {
       const compressed = await compressPhoto(photo);
@@ -196,6 +218,12 @@ export default function ScanScreen() {
         });
 
         if (!response.ok) {
+          if (response.error.code === "free_limit_reached") {
+            setLimitMessage(response.error.message);
+            setStep("limit");
+            return;
+          }
+
           setErrorMessage(getScanErrorMessage(response.error.message, mode));
           setStep("error");
           return;
@@ -227,6 +255,12 @@ export default function ScanScreen() {
       });
 
       if (!response.ok) {
+        if (response.code === "free_limit_reached") {
+          setLimitMessage(response.message);
+          setStep("limit");
+          return;
+        }
+
         setErrorMessage(getScanErrorMessage(response.message, mode));
         setStep("error");
         return;
@@ -254,6 +288,7 @@ export default function ScanScreen() {
     setResult(null);
     setSelectedAlternateIndex(null);
     setErrorMessage(null);
+    setLimitMessage(null);
     setStep("camera");
   }
 
@@ -315,6 +350,28 @@ export default function ScanScreen() {
           </View>
         </View>
       </View>
+    );
+  }
+
+  if (step === "limit" && photo) {
+    return (
+      <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={styles.resultContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Image source={{ uri: photo.uri }} style={styles.resultPhoto} />
+          <View style={styles.resultPanel}>
+            <UpgradePrompt
+              message={
+                limitMessage ??
+                "You've reached today's free scan limit. Upgrade to Premium for unlimited scans."
+              }
+              onDismiss={resetScan}
+            />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 

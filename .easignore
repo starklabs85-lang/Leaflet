@@ -1,0 +1,13 @@
+.git
+.expo
+.claude
+.codex
+.playwright-mcp
+node_modules
+android/.gradle
+android/app/build
+android/build
+builds
+logs
+*.log
+*.p8

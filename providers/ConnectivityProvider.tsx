@@ -91,6 +91,12 @@ async function checkSupabaseReachability() {
   try {
     const response = await fetch(`${env.supabaseUrl}/auth/v1/health`, {
       method: "GET",
+      // Supabase routes /auth/v1/* through Kong, which rejects requests
+      // without an apikey (HTTP 401). Send the anon key so a healthy
+      // backend reports as reachable instead of falsely "offline".
+      headers: env.supabaseAnonKey
+        ? { apikey: env.supabaseAnonKey }
+        : undefined,
       signal: controller.signal
     });
 

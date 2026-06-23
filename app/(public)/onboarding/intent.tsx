@@ -76,7 +76,7 @@ export default function OnboardingIntentScreen() {
         <Text style={styles.eyebrow}>Quick setup</Text>
         <Text style={styles.title}>Which plant parent are you?</Text>
         <Text style={styles.body}>
-          This stays on your device and just helps us tune your first-run flow.
+          This stays on your device and helps Leaflet show the most relevant setup steps.
         </Text>
 
         <View style={styles.options}>

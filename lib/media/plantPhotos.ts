@@ -6,6 +6,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 export const PLANT_PHOTOS_BUCKET = "plant-photos";
 const DEFAULT_MAX_PHOTO_EDGE = 1200;
 const DEFAULT_COMPRESSION = 0.8;
+const BYTE_READ_COMPRESSION = 0.8;
 
 type PlantPhotoFolder = "timeline";
 
@@ -51,17 +52,23 @@ export async function uploadPlantPhoto({
   userId: string;
 }) {
   const supabase = getSupabaseClient();
-  const blob = await uriToBlob(photoUri);
+  const bytes = await uriToBytes(photoUri);
   const fileName = `${Date.now()}-${Crypto.randomUUID()}.jpg`;
   const path = [userId, plantId, folder, fileName].filter(Boolean).join("/");
   const { error } = await supabase.storage
     .from(PLANT_PHOTOS_BUCKET)
-    .upload(path, blob, {
+    .upload(path, bytes, {
       contentType: "image/jpeg",
       upsert: false
-    });
+  });
 
   if (error) {
+    console.warn("Plant photo upload failed", {
+      bucket: PLANT_PHOTOS_BUCKET,
+      bytes: bytes.byteLength,
+      path,
+      message: error.message
+    });
     throw error;
   }
 
@@ -82,14 +89,59 @@ export async function removePlantPhotoByUrl(photoUrl: string | null | undefined)
   await getSupabaseClient().storage.from(PLANT_PHOTOS_BUCKET).remove([path]);
 }
 
-async function uriToBlob(uri: string) {
-  const response = await fetch(uri);
+// React Native's fetch().blob() does not reliably carry file bytes through
+// supabase-js Storage uploads (it yields 0-byte files or throws). Per Supabase's
+// React Native guidance, upload raw bytes instead. We re-read the image through
+// expo-image-manipulator (already a native dependency, so no rebuild) to get
+// base64, then decode it to a Uint8Array that supabase-js uploads correctly.
+async function uriToBytes(uri: string) {
+  const { base64 } = await ImageManipulator.manipulateAsync(uri, [], {
+    base64: true,
+    compress: BYTE_READ_COMPRESSION,
+    format: ImageManipulator.SaveFormat.JPEG
+  });
 
-  if (!response.ok) {
+  if (!base64) {
     throw new Error("Photo could not be read.");
   }
 
-  return response.blob();
+  return base64ToUint8Array(base64);
+}
+
+const BASE64_LOOKUP = (() => {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const table = new Int16Array(256).fill(-1);
+  for (let i = 0; i < chars.length; i += 1) {
+    table[chars.charCodeAt(i)] = i;
+  }
+  return table;
+})();
+
+function base64ToUint8Array(base64: string) {
+  const bytes = new Uint8Array(Math.floor((base64.length * 3) / 4));
+  let written = 0;
+  let buffer = 0;
+  let bits = 0;
+
+  for (let i = 0; i < base64.length; i += 1) {
+    const value = BASE64_LOOKUP[base64.charCodeAt(i)];
+
+    if (value === -1) {
+      continue; // skip padding (=), newlines, and any data-URI prefix noise
+    }
+
+    buffer = (buffer << 6) | value;
+    bits += 6;
+
+    if (bits >= 8) {
+      bits -= 8;
+      bytes[written] = (buffer >> bits) & 0xff;
+      written += 1;
+    }
+  }
+
+  return bytes.subarray(0, written);
 }
 
 function getPlantPhotoPathFromUrl(url: string | null | undefined) {

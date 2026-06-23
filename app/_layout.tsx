@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Fredoka_600SemiBold,
   Fredoka_700Bold
@@ -18,9 +18,11 @@ import {
 
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { theme } from "@/constants/theme";
+import { useFirebaseScreenTracking } from "@/lib/analytics/useFirebaseScreenTracking";
 import { useCareReminderNotificationRouting } from "@/lib/notifications/careReminders";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { ConnectivityProvider } from "@/providers/ConnectivityProvider";
+import { EntitlementProvider } from "@/providers/EntitlementProvider";
 import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
 
 // Keep the native splash visible until the brand fonts are ready so we never
@@ -28,6 +30,7 @@ import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvide
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function RootLayout() {
+  const [fontLoadTimedOut, setFontLoadTimedOut] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     Fredoka_600SemiBold,
     Fredoka_700Bold,
@@ -36,27 +39,40 @@ export default function RootLayout() {
     Nunito_700Bold,
     Nunito_800ExtraBold
   });
+  const canRender = fontsLoaded || Boolean(fontError) || fontLoadTimedOut;
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync().catch(() => undefined);
+      return undefined;
     }
+
+    const timeout = setTimeout(() => setFontLoadTimedOut(true), 3000);
+
+    return () => clearTimeout(timeout);
   }, [fontsLoaded, fontError]);
 
-  // Hold the splash until fonts resolve. If loading fails, render anyway with
-  // the system fallback rather than blocking the app forever.
-  if (!fontsLoaded && !fontError) {
-    return null;
+  useEffect(() => {
+    if (canRender) {
+      SplashScreen.hideAsync().catch(() => undefined);
+    }
+  }, [canRender]);
+
+  // Hold briefly for brand fonts, then render with system fallback instead of
+  // leaving users on a blank native splash if font loading stalls.
+  if (!canRender) {
+    return <LoadingScreen message="Loading Leaflet..." />;
   }
 
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <OnboardingProvider>
-          <ConnectivityProvider>
-            <AuthGate />
-          </ConnectivityProvider>
-        </OnboardingProvider>
+        <EntitlementProvider>
+          <OnboardingProvider>
+            <ConnectivityProvider>
+              <AuthGate />
+            </ConnectivityProvider>
+          </OnboardingProvider>
+        </EntitlementProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
@@ -68,53 +84,26 @@ function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
   const routeSegments = segments as string[];
+  const isAppLoading = auth.status === "loading" || onboarding.isLoading;
+  const pendingRedirect = isAppLoading
+    ? null
+    : getPendingAuthRedirect(routeSegments, auth.status, onboarding.status);
   useCareReminderNotificationRouting(auth.status === "authenticated");
+  useFirebaseScreenTracking({
+    enabled: !isAppLoading && pendingRedirect === null,
+    segments: routeSegments
+  });
 
   useEffect(() => {
-    if (auth.status === "loading" || onboarding.isLoading) {
+    if (!pendingRedirect) {
       return;
     }
 
-    const isPublicRoute = routeSegments[0] === "(public)";
-    const isPublicLegalRoute = isPublicRoute && routeSegments[1] === "legal";
-    const isAuthenticated = auth.status === "authenticated";
-    const isAuthOnboardingRoute =
-      routeSegments[0] === "(auth)" && routeSegments[1] === "onboarding";
-    const isFirstPlantLoopRoute =
-      routeSegments[0] === "(auth)" &&
-      ((routeSegments[1] === "(tabs)" && routeSegments[2] === "scan") ||
-        (routeSegments[1] === "plants" && routeSegments[2] === "save") ||
-        routeSegments[1] === "species");
+    router.replace(pendingRedirect as never);
+  }, [pendingRedirect, router]);
 
-    if (!isAuthenticated && !isPublicRoute) {
-      router.replace(
-        (onboarding.status === "needs_onboarding"
-          ? "/(public)/onboarding/welcome"
-          : "/(public)/sign-in") as never
-      );
-      return;
-    }
-
-    if (isAuthenticated && onboarding.status === "needs_onboarding") {
-      if (isPublicRoute || (!isAuthOnboardingRoute && !isFirstPlantLoopRoute)) {
-        router.replace("/(auth)/onboarding/first-scan" as never);
-      }
-      return;
-    }
-
-    if (isAuthenticated && isPublicRoute && !isPublicLegalRoute) {
-      router.replace("/(auth)/(tabs)/home");
-    }
-  }, [auth.status, onboarding.isLoading, onboarding.status, router, segments]);
-
-  if (auth.status === "loading" || onboarding.isLoading) {
-    return (
-      <View style={styles.loadingScreen}>
-        <Text style={styles.loadingEyebrow}>Leaflet</Text>
-        <Text style={styles.loadingText}>Restoring your session...</Text>
-        <StatusBar style="dark" />
-      </View>
-    );
+  if (isAppLoading) {
+    return <LoadingScreen message="Restoring your session..." />;
   }
 
   return (
@@ -132,6 +121,53 @@ function AuthGate() {
       <OfflineBanner />
       <StatusBar style="dark" />
     </>
+  );
+}
+
+function getPendingAuthRedirect(
+  routeSegments: string[],
+  authStatus: ReturnType<typeof useAuth>["status"],
+  onboardingStatus: ReturnType<typeof useOnboarding>["status"]
+) {
+  const isPublicRoute = routeSegments[0] === "(public)";
+  const isPublicLegalRoute = isPublicRoute && routeSegments[1] === "legal";
+  const isAuthenticated = authStatus === "authenticated";
+  const isAuthOnboardingRoute =
+    routeSegments[0] === "(auth)" && routeSegments[1] === "onboarding";
+  const isFirstPlantLoopRoute =
+    routeSegments[0] === "(auth)" &&
+    ((routeSegments[1] === "(tabs)" && routeSegments[2] === "scan") ||
+      (routeSegments[1] === "plants" && routeSegments[2] === "save") ||
+      routeSegments[1] === "species");
+
+  if (!isAuthenticated && !isPublicRoute) {
+    return onboardingStatus === "needs_onboarding"
+      ? "/(public)/onboarding/welcome"
+      : "/(public)/sign-in";
+  }
+
+  if (
+    isAuthenticated &&
+    onboardingStatus === "needs_onboarding" &&
+    (isPublicRoute || (!isAuthOnboardingRoute && !isFirstPlantLoopRoute))
+  ) {
+    return "/(auth)/onboarding/first-scan";
+  }
+
+  if (isAuthenticated && isPublicRoute && !isPublicLegalRoute) {
+    return "/(auth)/(tabs)/home";
+  }
+
+  return null;
+}
+
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <View style={styles.loadingScreen}>
+      <Text style={styles.loadingEyebrow}>Leaflet</Text>
+      <Text style={styles.loadingText}>{message}</Text>
+      <StatusBar style="dark" />
+    </View>
   );
 }
 

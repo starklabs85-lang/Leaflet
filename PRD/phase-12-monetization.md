@@ -16,20 +16,32 @@
 
 The PRD's competitive wedge is a **generous, non-nagging free tier**. The free tier must be genuinely useful — not a crippled demo.
 
+**v1 paywall — what ships in this phase.** Every feature below is already built; this phase only adds entitlement state and limit checks on top of existing functionality. We deliberately sell *only what exists* so a paying user never sees an advertised feature they can't use (also avoids App Store rejection for unavailable functionality).
+
 | Feature | Free | Premium |
 |---------|------|---------|
 | Plant identification scans | 5 per day | Unlimited |
 | Disease diagnosis scans | 3 per day | Unlimited |
 | Plants in collection | 10 | Unlimited |
+| Growth photo timeline | 1 photo/plant/month | Unlimited |
 | Care scheduling & logging | Full | Full |
 | Dashboard & notifications | Full | Full |
-| Growth photo timeline | 1 photo/plant/month | Unlimited |
-| Detailed care history export | No | Yes |
-| Priority scan processing | No | Yes (faster queue) |
-| Advanced charts & stats | Basic chart | Full analytics |
-| Ad-free experience | Minimal, non-intrusive | Yes |
+| Weather-aware care tips (Phase 14) | Full | Full |
 
 **Key principle**: The core loop (scan → info → track → care) works fully on free. Premium adds volume, depth, and convenience — not gating of core features.
+
+**Deferred premium features (NOT in this phase).** These were in earlier drafts but are not yet built, so they are excluded from the v1 paywall. Add them to the premium offering only once they ship, to avoid selling vaporware:
+
+| Feature | Status | Where it lands |
+|---------|--------|----------------|
+| Advanced charts & full analytics | Not built (only the basic 8-week consistency chart + streak/weekly stats exist) | **Phase 15 — Advanced Analytics** (premium-gated) |
+| Detailed care history export (PDF/CSV) | Not built | Future phase, bundle with or after Phase 15 |
+
+Dropped entirely:
+- **Priority scan processing** — a single-pipeline solo app can't honestly deliver a faster queue; a fake perk erodes trust. Replace with real depth (e.g. analytics) instead.
+- **Ads** — already deferred in the tech notes; the brand wedge is calm, ad-free.
+
+> **Build order (per product owner):** ship this phase's paywall + capping first and verify it works end-to-end; *then* build Phase 15 and add advanced analytics to the premium offering.
 
 ### 2. Subscription setup
 
@@ -61,9 +73,9 @@ The PRD's competitive wedge is a **generous, non-nagging free tier**. The free t
 
 ### 4. Scan limit enforcement
 
-- Track daily scan count per user:
-  - Count `scan_cache` entries or `care_logs` with `task_type = 'identify'` created today.
-  - Or maintain a simple counter in `AsyncStorage` (reset daily).
+- Track daily scan count per user, **separately for identify and diagnose** (they have different free limits — 5 vs. 3):
+  - The existing `scan_events` table only records `scan_type = 'identify'` (its check constraint rejects anything else). To enforce the diagnosis cap you must **extend `scan_events` to accept `'diagnose'`** (update the `scan_type` check constraint) and write a `scan_events` row from the diagnosis flow, *or* count diagnosis runs another way (e.g. `care_logs` / a dedicated diagnosis table). Pick one source of truth per scan type and count "today" against it.
+  - Or maintain a simple counter in `AsyncStorage` (reset daily) — but a server-side count is harder to bypass and survives reinstalls.
 - When the free limit is reached:
   - Show a friendly message: "You've used your 5 free scans today. Upgrade to Leaflet Premium for unlimited scans."
   - **Do not block the screen.** Show the message inline with a "Maybe later" dismissal.

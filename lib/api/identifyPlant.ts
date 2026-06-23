@@ -32,6 +32,15 @@ export async function identifyPlant(input: IdentifyPlantFunctionRequest) {
   );
 
   if (error) {
+    // Non-2xx responses surface as FunctionsHttpError with the structured
+    // error payload still on the response — recover it so limit/rate codes
+    // reach the UI instead of a generic message.
+    const structured = await parseFunctionErrorBody(error);
+
+    if (structured) {
+      return structured;
+    }
+
     return {
       ok: false,
       error: {
@@ -54,4 +63,29 @@ export async function identifyPlant(input: IdentifyPlantFunctionRequest) {
   }
 
   return data;
+}
+
+async function parseFunctionErrorBody(
+  error: unknown
+): Promise<IdentifyPlantResponse | null> {
+  const context =
+    typeof error === "object" && error !== null && "context" in error
+      ? (error as { context: unknown }).context
+      : null;
+
+  if (!(context instanceof Response)) {
+    return null;
+  }
+
+  try {
+    const payload = (await context.clone().json()) as IdentifyPlantResponse;
+
+    if (payload && payload.ok === false && payload.error?.message) {
+      return payload;
+    }
+  } catch {
+    // Body was not the function's JSON error shape; fall through.
+  }
+
+  return null;
 }

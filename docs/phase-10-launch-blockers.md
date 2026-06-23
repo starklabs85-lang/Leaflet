@@ -29,7 +29,7 @@ These are external setup items, not app-code blockers.
 - Test on a physical iPhone with camera, photo library, notification permission, and real network changes.
 - Validate Apple sign-in on iOS hardware.
 - Validate notification delivery and notification-tap routing; this cannot be proven by TypeScript or simulator-only checks.
-- Capture App Store screenshots from a production-like build after the core flow passes.
+- Capture App Store screenshots from a release-candidate build after the core flow passes.
 
 ## Legal Hosting Decision
 

@@ -56,6 +56,7 @@ export type SavedDiagnosis = {
 export type DiagnosisErrorCode =
   | "auth_required"
   | "empty_response"
+  | "free_limit_reached"
   | "function_error"
   | "invalid_input"
   | "network_error"

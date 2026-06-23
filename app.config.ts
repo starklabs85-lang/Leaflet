@@ -13,10 +13,15 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.countrybean.leaflet",
-    usesAppleSignIn: true
+    usesAppleSignIn: true,
+    googleServicesFile: "./GoogleService-Info.plist",
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false
+    }
   },
   android: {
-    package: "com.countrybean.leaflet"
+    package: "com.countrybean.leaflet",
+    googleServicesFile: "./google-services.json"
   },
   plugins: [
     "expo-router",
@@ -27,12 +32,39 @@ const config: ExpoConfig = {
     "expo-image-picker",
     "expo-notifications",
     "expo-apple-authentication",
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "Leaflet uses your approximate location only to tailor plant care tips to your local weather.",
+        isAndroidBackgroundLocationEnabled: false
+      }
+    ],
+    "@react-native-firebase/app",
+    [
+      "@react-native-firebase/analytics",
+      {
+        ios: {
+          withoutAdIdSupport: true
+        }
+      }
+    ],
+    [
+      "expo-build-properties",
+      {
+        ios: {
+          useFrameworks: "static",
+          forceStaticLinking: ["RNFBAnalytics", "RNFBApp"]
+        }
+      }
+    ],
     ...(googleIosUrlScheme
       ? [
           [
             "@react-native-google-signin/google-signin",
             { iosUrlScheme: googleIosUrlScheme }
-          ] as [string, { iosUrlScheme: string }]
+          ] as [string, { iosUrlScheme: string }],
+          "./plugins/withGoogleSignInModularHeaders"
         ]
       : [])
   ],
@@ -44,7 +76,10 @@ const config: ExpoConfig = {
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
     googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
     googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "",
-    googleIosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ?? ""
+    googleIosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ?? "",
+    eas: {
+      projectId: "63ea258d-3a71-4b3e-b43b-0d1d94baa969"
+    }
   }
 };
 

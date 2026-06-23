@@ -7,12 +7,14 @@ type ChunkManifest = {
   chunks: number;
 };
 
+// SecureStore keys may only contain alphanumeric characters, ".", "-", and "_".
+// Colons are rejected, so we use "." to namespace manifest and chunk entries.
 function getManifestKey(key: string) {
-  return `${key}:manifest`;
+  return `${key}.manifest`;
 }
 
 function getChunkKey(key: string, index: number) {
-  return `${key}:chunk:${index}`;
+  return `${key}.chunk.${index}`;
 }
 
 async function readManifest(key: string) {

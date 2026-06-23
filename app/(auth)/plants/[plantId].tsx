@@ -19,7 +19,10 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { UpgradePrompt } from "@/components/payments/UpgradePrompt";
+import { PlantEnvironmentFields } from "@/components/plants/PlantEnvironmentFields";
 import { PlantImage } from "@/components/ui/PlantImage";
+import { PlantWeatherNote } from "@/components/weather/PlantWeatherNote";
 import { theme } from "@/constants/theme";
 import {
   applyOptimisticQuickLog,
@@ -42,6 +45,8 @@ import {
   updateUserPlant
 } from "@/lib/api/plantCollection";
 import { preparePlantPhoto } from "@/lib/media/plantPhotos";
+import { checkGrowthPhotoAllowance } from "@/lib/payments/limits";
+import { useEntitlement } from "@/providers/EntitlementProvider";
 import type {
   CareLog,
   CareLogType,
@@ -50,7 +55,12 @@ import type {
 } from "@/types/careSchedule";
 import { DIAGNOSIS_ADVISORY, type SavedDiagnosis } from "@/types/diagnosis";
 import type { GrowthPhoto } from "@/types/growthTimeline";
-import type { PlantStatus, SavedPlant } from "@/types/plantCollection";
+import type {
+  LightExposure,
+  PlantPlacement,
+  PlantStatus,
+  SavedPlant
+} from "@/types/plantCollection";
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -85,6 +95,8 @@ export default function PlantDetailScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [nickname, setNickname] = useState("");
   const [location, setLocation] = useState("");
+  const [placement, setPlacement] = useState<PlantPlacement>("unknown");
+  const [lightExposure, setLightExposure] = useState<LightExposure>("unknown");
   const [status, setStatus] = useState<PlantStatus>("healthy");
   const [replacementPhotoUri, setReplacementPhotoUri] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -103,6 +115,8 @@ export default function PlantDetailScreen() {
   >(null);
   const [selectedGrowthPhoto, setSelectedGrowthPhoto] =
     useState<GrowthPhoto | null>(null);
+  const [growthLimitMessage, setGrowthLimitMessage] = useState<string | null>(null);
+  const { isPremium } = useEntitlement();
 
   const loadPlant = useCallback(async () => {
     setLoadState({ status: "loading" });
@@ -154,6 +168,8 @@ export default function PlantDetailScreen() {
     setTaskDrafts(buildTaskDrafts(tasks));
     setNickname(result.data.nickname ?? "");
     setLocation(result.data.location ?? "");
+    setPlacement(result.data.placement);
+    setLightExposure(result.data.lightExposure);
     setStatus(result.data.status);
     setReplacementPhotoUri(null);
   }, [plantId]);
@@ -245,6 +261,8 @@ export default function PlantDetailScreen() {
       plantId: loadState.plant.id,
       nickname,
       location,
+      placement,
+      lightExposure,
       status,
       photoUri: replacementPhotoUri
     });
@@ -328,6 +346,18 @@ export default function PlantDetailScreen() {
 
     setCareMessage(null);
     setMessage(null);
+    setGrowthLimitMessage(null);
+
+    const allowance = await checkGrowthPhotoAllowance({
+      isPremium,
+      userPlantId: loadState.plant.id
+    });
+
+    if (!allowance.allowed) {
+      setGrowthLimitMessage(allowance.message);
+      return;
+    }
+
     setPendingGrowthSource(source);
 
     try {
@@ -639,6 +669,8 @@ export default function PlantDetailScreen() {
             <Text style={styles.locationTag}>{plant.location}</Text>
           ) : null}
 
+          <PlantWeatherNote onTaskAdjusted={loadPlant} plantId={plant.id} />
+
           <QuickLogPanel
             confirmedAction={confirmedAction}
             noteText={noteText}
@@ -708,6 +740,14 @@ export default function PlantDetailScreen() {
             taskDrafts={taskDrafts}
             tasks={loadState.tasks}
           />
+          {growthLimitMessage ? (
+            <UpgradePrompt
+              message={growthLimitMessage}
+              onDismiss={() => setGrowthLimitMessage(null)}
+              style={styles.growthLimitPrompt}
+              title="Growth timeline limit"
+            />
+          ) : null}
           <GrowthTimelineSection
             error={loadState.growthError}
             noteText={growthNote}
@@ -752,6 +792,12 @@ export default function PlantDetailScreen() {
                 placeholderTextColor={theme.colors.moss}
                 style={styles.input}
                 value={location}
+              />
+              <PlantEnvironmentFields
+                lightExposure={lightExposure}
+                onChangeLightExposure={setLightExposure}
+                onChangePlacement={setPlacement}
+                placement={placement}
               />
               <Text style={styles.label}>Status</Text>
               <View style={styles.statusOptions}>
@@ -800,6 +846,8 @@ export default function PlantDetailScreen() {
                     setReplacementPhotoUri(null);
                     setNickname(plant.nickname ?? "");
                     setLocation(plant.location ?? "");
+                    setPlacement(plant.placement);
+                    setLightExposure(plant.lightExposure);
                     setStatus(plant.status);
                     setMessage(null);
                   }}
@@ -2166,6 +2214,10 @@ const styles = StyleSheet.create({
   editPanel: {
     marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.xl
+  },
+  growthLimitPrompt: {
+    marginHorizontal: theme.spacing.xl,
+    marginTop: theme.spacing.xl
   },
   label: {
     color: theme.colors.forest,

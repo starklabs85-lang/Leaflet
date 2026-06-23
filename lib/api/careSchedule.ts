@@ -821,6 +821,102 @@ export async function updateCareTask({
   };
 }
 
+// One-tap adjustment offered by a weather tip (rain → snooze, heat → advance).
+// Always user-confirmed by the tap itself; never applied silently.
+export async function applyWeatherCareAdjustment({
+  taskId,
+  kind,
+  days
+}: {
+  taskId: string;
+  kind: "snooze_watering" | "advance_watering";
+  days: number;
+}): Promise<CareResult<CareTask>> {
+  const normalizedTaskId = normalizeId(taskId);
+  const roundedDays = Math.round(days);
+
+  if (!normalizedTaskId || !Number.isFinite(roundedDays) || roundedDays < 1 || roundedDays > 7) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      message: "That care adjustment is not valid."
+    };
+  }
+
+  const userResult = await getCurrentUser();
+
+  if (!userResult.ok) {
+    return {
+      ok: false,
+      code: "auth_required",
+      message: userResult.message
+    };
+  }
+
+  const supabase = getSupabaseClient();
+  const { data: taskRow, error: taskError } = await supabase
+    .from("care_tasks")
+    .select(
+      "id, user_plant_id, user_id, type, interval_days, next_due_date, is_active, created_at, updated_at"
+    )
+    .eq("id", normalizedTaskId)
+    .eq("user_id", userResult.user.id)
+    .maybeSingle()
+    .returns<CareTaskRow | null>();
+
+  if (taskError) {
+    return {
+      ok: false,
+      code: "network_error",
+      message: "Care task could not be loaded."
+    };
+  }
+
+  if (!taskRow) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "Care task not found."
+    };
+  }
+
+  const today = getLocalDateString();
+  const nextDueDate =
+    kind === "snooze_watering"
+      ? addDaysToLocalDate(roundedDays)
+      : (() => {
+          const advanced = addDaysToLocalDate(-roundedDays, parseLocalDate(taskRow.next_due_date));
+
+          return advanced < today ? today : advanced;
+        })();
+
+  const { data, error } = await supabase
+    .from("care_tasks")
+    .update({ next_due_date: nextDueDate })
+    .eq("id", normalizedTaskId)
+    .eq("user_id", userResult.user.id)
+    .select(
+      "id, user_plant_id, user_id, type, interval_days, next_due_date, is_active, created_at, updated_at"
+    )
+    .maybeSingle()
+    .returns<CareTaskRow | null>();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      code: "network_error",
+      message: "The schedule change could not be saved."
+    };
+  }
+
+  await syncTaskReminderSafely(data.id);
+
+  return {
+    ok: true,
+    data: toCareTask(data)
+  };
+}
+
 async function syncTaskReminderSafely(taskId: string) {
   try {
     await syncCareTaskReminder(taskId);
