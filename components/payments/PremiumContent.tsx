@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Linking, StyleSheet, Text, View } from "react-native";
+import { Linking, Platform, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import type { PurchasesPackage } from "react-native-purchases";
@@ -16,10 +16,6 @@ type ComparisonRow = {
   premium: string;
 };
 
-/**
- * Phase 12 contract: sell only what exists. The core loop rows stay listed so
- * the free tier reads as genuinely useful, not a crippled demo.
- */
 const COMPARISON_ROWS: ComparisonRow[] = [
   {
     feature: "Plant identification",
@@ -28,21 +24,23 @@ const COMPARISON_ROWS: ComparisonRow[] = [
   },
   {
     feature: "Disease diagnosis",
-    free: `${FREE_LIMITS.diagnoseScansPerDay}/day`,
+    free: "Premium only",
     premium: "Unlimited"
   },
   {
-    feature: "Plants in collection",
-    free: `${FREE_LIMITS.plantsInCollection}`,
-    premium: "Unlimited"
+    feature: "Save plants",
+    free: "Premium only",
+    premium: "Included"
   },
   {
-    feature: "Growth photo timeline",
-    free: "1/plant/month",
-    premium: "Unlimited"
+    feature: "Care information",
+    free: "Premium only",
+    premium: "Included"
   },
-  { feature: "Care schedules & reminders", free: "Full", premium: "Full" },
-  { feature: "Weather-aware care tips", free: "Full", premium: "Full" }
+  { feature: "Collection dashboard", free: "Premium only", premium: "Included" },
+  { feature: "Care schedules & reminders", free: "Premium only", premium: "Included" },
+  { feature: "Weather-aware care tips", free: "Premium only", premium: "Included" },
+  { feature: "Growth photo timeline", free: "Premium only", premium: "Included" }
 ];
 
 type PremiumContentProps = {
@@ -57,17 +55,26 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
     isLoading,
     monthlyPackage,
     annualPackage,
-    isTrialEligible,
+    trialEligibilityByProductId,
     purchase,
-    restore
+    restore,
+    redeemOfferCode
   } = useEntitlement();
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">("annual");
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isRedeemingCode, setIsRedeemingCode] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const selectedPackage =
     selectedPlan === "annual" ? (annualPackage ?? monthlyPackage) : monthlyPackage;
+  const selectedPackagePeriod =
+    selectedPackage?.product.identifier === annualPackage?.product.identifier
+      ? "year"
+      : "month";
+  const selectedPackageTrialEligible = selectedPackage
+    ? trialEligibilityByProductId[selectedPackage.product.identifier] === true
+    : false;
   const annualSavingPercent = getAnnualSavingPercent(monthlyPackage, annualPackage);
 
   async function handlePurchase() {
@@ -119,6 +126,28 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
     setFeedback(outcome.message);
   }
 
+  async function handleRedeemOfferCode() {
+    if (isRedeemingCode) {
+      return;
+    }
+
+    setIsRedeemingCode(true);
+    setFeedback(null);
+
+    const outcome = await redeemOfferCode();
+
+    setIsRedeemingCode(false);
+
+    if (outcome.status === "presented") {
+      setFeedback(
+        "If the code was redeemed, Premium will update after the store confirms it."
+      );
+      return;
+    }
+
+    setFeedback(outcome.message);
+  }
+
   if (isPremium) {
     return (
       <View style={styles.premiumActiveCard}>
@@ -130,8 +159,8 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
         <Text style={styles.premiumActiveTitle}>You're on Premium</Text>
         <Text style={styles.premiumActiveBody}>
           {expiresAt
-            ? `Unlimited scans, plants, and growth photos. Renews or expires ${formatDate(expiresAt)}.`
-            : "Unlimited scans, plants, and growth photos are unlocked."}
+            ? `Unlimited scans and every care feature are unlocked. Renews or expires ${formatDate(expiresAt)}.`
+            : "Unlimited scans and every care feature are unlocked."}
         </Text>
         <Text style={styles.manageHint}>
           Manage or cancel anytime in your app store subscription settings.
@@ -152,8 +181,7 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
             size={22}
           />
           <Text style={styles.unavailableText}>
-            Plans aren't available right now. Please check back soon — your free
-            features keep working as always.
+            Plans aren't available right now. Please check back soon.
           </Text>
         </View>
       ) : (
@@ -182,7 +210,9 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
 
           <Button
             accessibilityLabel={
-              isTrialEligible ? "Start 7-day free trial" : "Upgrade to Premium"
+              selectedPackageTrialEligible
+                ? "Start 7-day free trial"
+                : "Upgrade to Premium"
             }
             disabled={!selectedPackage || isPurchasing}
             gradient
@@ -190,7 +220,7 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
             label={
               isPurchasing
                 ? "Connecting to the store..."
-                : isTrialEligible
+                : selectedPackageTrialEligible
                   ? "Start 7-day free trial"
                   : "Upgrade to Premium"
             }
@@ -198,10 +228,10 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
             onPress={handlePurchase}
             style={styles.purchaseButton}
           />
-          {isTrialEligible ? (
+          {selectedPackageTrialEligible ? (
             <Text style={styles.trialHint}>
               Free for 7 days, then {selectedPackage?.product.priceString ?? ""}
-              {selectedPlan === "annual" ? " per year" : " per month"}. Cancel
+              {` per ${selectedPackagePeriod}`}. Cancel
               anytime before the trial ends and you won't be charged.
             </Text>
           ) : null}
@@ -218,6 +248,16 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
         onPress={handleRestore}
         variant="ghost"
       />
+      {Platform.OS === "ios" ? (
+        <Button
+          accessibilityLabel="Redeem App Store offer code"
+          disabled={isRedeemingCode}
+          label={isRedeemingCode ? "Opening App Store..." : "Redeem offer code"}
+          loading={isRedeemingCode}
+          onPress={handleRedeemOfferCode}
+          variant="ghost"
+        />
+      ) : null}
 
       <View style={styles.termsRow}>
         <PressableScale
@@ -278,10 +318,6 @@ function ComparisonTable() {
           </Text>
         </View>
       ))}
-      <Text style={styles.tableFootnote}>
-        Free forever: identifying, care schedules, reminders, and weather tips
-        never go behind a paywall.
-      </Text>
     </View>
   );
 }

@@ -204,6 +204,43 @@ export async function restorePremiumPurchases(): Promise<RestoreOutcome> {
   }
 }
 
+export type OfferCodeRedemptionOutcome =
+  | { status: "presented" }
+  | { status: "unavailable"; message: string }
+  | { status: "error"; message: string };
+
+export async function presentSubscriptionOfferCodeRedemption(): Promise<
+  OfferCodeRedemptionOutcome
+> {
+  if (!configured) {
+    return {
+      status: "unavailable",
+      message: "Offer code redemption is not available in this build."
+    };
+  }
+
+  if (Platform.OS !== "ios") {
+    return {
+      status: "unavailable",
+      message: "Offer code redemption is available only on iOS."
+    };
+  }
+
+  try {
+    await Purchases.presentCodeRedemptionSheet();
+
+    return { status: "presented" };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error && error.message
+          ? error.message
+          : "The offer code sheet could not be opened. Please try again."
+    };
+  }
+}
+
 /**
  * Whether the signed-in store account is still eligible for the 7-day
  * introductory free trial. Apple grants intro offers once per subscription
@@ -214,12 +251,12 @@ export async function restorePremiumPurchases(): Promise<RestoreOutcome> {
 export async function isEligibleForIntroTrial(
   pkg: PurchasesPackage | null
 ): Promise<boolean> {
-  if (!configured || !pkg) {
+  if (!configured || !pkg || !hasIntroPhase(pkg)) {
     return false;
   }
 
   if (Platform.OS !== "ios") {
-    return hasIntroPhase(pkg);
+    return true;
   }
 
   try {
