@@ -3,6 +3,8 @@
 .claude
 .codex
 .playwright-mcp
+.env
+.env.local
 node_modules
 android/.gradle
 android/app/build

@@ -29,11 +29,12 @@ export default function PremiumScreen() {
         <Text style={styles.backText}>Back</Text>
       </PressableScale>
 
-      <Text style={styles.eyebrow}>Leaflet Premium</Text>
+      <Text style={styles.eyebrow}>Fernly Premium</Text>
       <Text style={styles.title}>Grow without limits</Text>
       <Text style={styles.subtitle}>
-        Everything you already love stays free. Premium removes the caps for
-        power users and big collections.
+        Free includes one plant identification scan per day. Premium unlocks
+        diagnosis, saved plants, care info, reminders, weather tips, and growth
+        photos.
       </Text>
 
       <PremiumContent />

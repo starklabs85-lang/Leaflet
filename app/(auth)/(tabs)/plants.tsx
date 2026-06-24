@@ -10,6 +10,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
 import { EmptyPlants } from "@/components/illustrations/EmptyPlants";
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -19,6 +20,7 @@ import { PressableScale } from "@/components/ui/PressableScale";
 import { Screen } from "@/components/ui/Screen";
 import { theme } from "@/constants/theme";
 import { listUserPlants } from "@/lib/api/plantCollection";
+import { useEntitlement } from "@/providers/EntitlementProvider";
 import type { PlantStatus, SavedPlant } from "@/types/plantCollection";
 
 type LoadState =
@@ -27,6 +29,22 @@ type LoadState =
   | { status: "error"; message: string };
 
 export default function PlantsScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Collection requires Premium"
+        message="Saving plants, collection actions, care schedules, and growth history are included with Premium. You can still scan one plant per day."
+        icon="sprout-outline"
+      />
+    );
+  }
+
+  return <PremiumPlantsScreen />;
+}
+
+function PremiumPlantsScreen() {
   const params = useLocalSearchParams<{ speciesId?: string | string[] }>();
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
   const [refreshing, setRefreshing] = useState(false);

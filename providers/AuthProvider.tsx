@@ -10,21 +10,16 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 
 import {
-  type EmailPasswordCredentials,
-  type EmailPasswordSignUpResult,
   isUserCancelledAuthError,
-  signInWithEmailPassword as signInWithEmailPasswordAction,
   signInWithAppleIdToken,
-  signInWithDevTestAccount,
   signInWithGoogleIdToken,
-  signUpWithEmailPassword as signUpWithEmailPasswordAction,
   signOutOfNativeProviders
 } from "@/lib/auth";
 import { getSupabaseConfigIssue, hasSupabaseConfig } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
 
 type AuthStatus = "loading" | "authenticated" | "signed-out" | "missing-config";
-type AuthProviderName = "apple" | "google" | "dev" | "email-sign-in" | "email-sign-up";
+type AuthProviderName = "apple" | "google";
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -33,13 +28,8 @@ type AuthContextValue = {
   errorMessage: string | null;
   activeProvider: AuthProviderName | null;
   isLoading: boolean;
-  signInWithEmailPassword: (credentials: EmailPasswordCredentials) => Promise<void>;
-  signUpWithEmailPassword: (
-    credentials: EmailPasswordCredentials
-  ) => Promise<EmailPasswordSignUpResult | undefined>;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signInWithDevTest: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 };
@@ -111,7 +101,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (!isUserCancelledAuthError(error)) {
           const message = formatAuthError(error);
 
-          console.warn("Leaflet auth action failed", {
+          console.warn("Fernly auth action failed", {
             provider,
             message,
             error
@@ -126,22 +116,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     []
   );
 
-  const signInWithEmailPassword = useCallback(
-    (credentials: EmailPasswordCredentials) =>
-      runAuthAction("email-sign-in", () =>
-        signInWithEmailPasswordAction(credentials)
-      ) as Promise<void>,
-    [runAuthAction]
-  );
-
-  const signUpWithEmailPassword = useCallback(
-    (credentials: EmailPasswordCredentials) =>
-      runAuthAction("email-sign-up", () =>
-        signUpWithEmailPasswordAction(credentials)
-      ),
-    [runAuthAction]
-  );
-
   const signInWithApple = useCallback(
     () => runAuthAction("apple", signInWithAppleIdToken),
     [runAuthAction]
@@ -152,11 +126,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       runAuthAction("google", async () => {
         await signInWithGoogleIdToken();
       }),
-    [runAuthAction]
-  );
-
-  const signInWithDevTest = useCallback(
-    () => runAuthAction("dev", signInWithDevTestAccount),
     [runAuthAction]
   );
 
@@ -194,11 +163,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       errorMessage,
       activeProvider,
       isLoading: status === "loading" || activeProvider !== null,
-      signInWithEmailPassword,
-      signUpWithEmailPassword,
       signInWithApple,
       signInWithGoogle,
-      signInWithDevTest,
       signOut,
       clearError
     }),
@@ -207,11 +173,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       clearError,
       errorMessage,
       session,
-      signInWithEmailPassword,
       signInWithApple,
       signInWithGoogle,
-      signUpWithEmailPassword,
-      signInWithDevTest,
       signOut,
       status
     ]
@@ -286,7 +249,7 @@ function formatAuthError(error: unknown) {
     normalized.includes("fetch") ||
     normalized.includes("timeout")
   ) {
-    return "Leaflet could not reach the sign-in service. Check your connection and try again.";
+    return "Fernly could not reach the sign-in service. Check your connection and try again.";
   }
 
   return code ? `${message} (code: ${code})` : message;
@@ -295,5 +258,5 @@ function formatAuthError(error: unknown) {
 function getAuthStartupErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
-    : "Leaflet could not restore your session. Please sign in again.";
+    : "Fernly could not restore your session. Please sign in again.";
 }

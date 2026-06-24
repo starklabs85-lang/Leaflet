@@ -12,11 +12,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { PlantImage } from "@/components/ui/PlantImage";
 import { theme } from "@/constants/theme";
 import { saveDiagnosis } from "@/lib/api/diagnosis";
 import { listUserPlants } from "@/lib/api/plantCollection";
 import { getDiagnosisDraft } from "@/lib/diagnosisDraftStore";
+import { useEntitlement } from "@/providers/EntitlementProvider";
 import type { DiagnosisDraft, SavedDiagnosis } from "@/types/diagnosis";
 import { DIAGNOSIS_ADVISORY } from "@/types/diagnosis";
 import type { SavedPlant } from "@/types/plantCollection";
@@ -27,6 +29,22 @@ type LoadState =
   | { status: "missing" };
 
 export default function DiagnosisResultScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Diagnosis requires Premium"
+        message="Disease and pest diagnosis, treatment plans, follow-up reminders, and diagnosis history are included with Premium."
+        icon="stethoscope"
+      />
+    );
+  }
+
+  return <PremiumDiagnosisResultScreen />;
+}
+
+function PremiumDiagnosisResultScreen() {
   const params = useLocalSearchParams<{ draftId?: string | string[] }>();
   const draftId = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });

@@ -14,6 +14,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { UpgradePrompt } from "@/components/payments/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { IconChip } from "@/components/ui/IconChip";
@@ -68,6 +69,22 @@ const MAX_NAME_LENGTH = 40;
 const MAX_LOCATION_LENGTH = 40;
 
 export default function SavePlantScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Saving plants requires Premium"
+        message="Premium unlocks saved plants, collection setup, care schedules, reminders, and growth history."
+        icon="content-save-outline"
+      />
+    );
+  }
+
+  return <PremiumSavePlantScreen />;
+}
+
+function PremiumSavePlantScreen() {
   const onboarding = useOnboarding();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -183,7 +200,7 @@ export default function SavePlantScreen() {
     setMessage(null);
     setLimitMessage(null);
 
-    // Free accounts track up to 10 plants; existing plants stay fully usable.
+    // Save is Premium-only; this remains as a second guard at the write point.
     const allowance = await checkCollectionAllowance(isPremium);
 
     if (!allowance.allowed) {

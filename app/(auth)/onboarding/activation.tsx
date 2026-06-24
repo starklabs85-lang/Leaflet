@@ -98,7 +98,7 @@ function getCarePreview(waterInDays: number | null) {
     }.`;
   }
 
-  return "Your dashboard is active, and Leaflet will surface care tasks as they come due.";
+  return "Your dashboard is active, and Fernly will surface care tasks as they come due.";
 }
 
 const styles = StyleSheet.create({

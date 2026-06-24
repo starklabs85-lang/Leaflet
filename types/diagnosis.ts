@@ -61,6 +61,7 @@ export type DiagnosisErrorCode =
   | "invalid_input"
   | "network_error"
   | "not_found"
+  | "premium_required"
   | "validation_failed";
 
 export type DiagnosisServiceResult<T> =
@@ -84,4 +85,3 @@ export type DiagnosisRow = Database["public"]["Tables"]["diagnoses"]["Row"];
 
 export const DIAGNOSIS_ADVISORY =
   "This diagnosis is AI-generated and advisory. For serious plant health concerns, consult a local nursery or extension service.";
-

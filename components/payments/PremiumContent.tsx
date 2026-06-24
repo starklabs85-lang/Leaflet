@@ -10,37 +10,65 @@ import { theme } from "@/constants/theme";
 import { FREE_LIMITS } from "@/lib/payments/limits";
 import { useEntitlement } from "@/providers/EntitlementProvider";
 
+type ComparisonCell =
+  | { type: "text"; label: string }
+  | { type: "icon"; included: boolean };
+
 type ComparisonRow = {
   feature: string;
-  free: string;
-  premium: string;
+  free: ComparisonCell;
+  premium: ComparisonCell;
 };
+
+function textCell(label: string): ComparisonCell {
+  return { type: "text", label };
+}
+
+function iconCell(included: boolean): ComparisonCell {
+  return { type: "icon", included };
+}
 
 const COMPARISON_ROWS: ComparisonRow[] = [
   {
     feature: "Plant identification",
-    free: `${FREE_LIMITS.identifyScansPerDay}/day`,
-    premium: "Unlimited"
+    free: textCell(`${FREE_LIMITS.identifyScansPerDay}/day`),
+    premium: textCell("Unlimited")
   },
   {
     feature: "Disease diagnosis",
-    free: "Premium only",
-    premium: "Unlimited"
+    free: iconCell(false),
+    premium: iconCell(true)
   },
   {
     feature: "Save plants",
-    free: "Premium only",
-    premium: "Included"
+    free: iconCell(false),
+    premium: iconCell(true)
   },
   {
     feature: "Care information",
-    free: "Premium only",
-    premium: "Included"
+    free: iconCell(false),
+    premium: iconCell(true)
   },
-  { feature: "Collection dashboard", free: "Premium only", premium: "Included" },
-  { feature: "Care schedules & reminders", free: "Premium only", premium: "Included" },
-  { feature: "Weather-aware care tips", free: "Premium only", premium: "Included" },
-  { feature: "Growth photo timeline", free: "Premium only", premium: "Included" }
+  {
+    feature: "Collection dashboard",
+    free: iconCell(false),
+    premium: iconCell(true)
+  },
+  {
+    feature: "Care schedules & reminders",
+    free: iconCell(false),
+    premium: iconCell(true)
+  },
+  {
+    feature: "Weather-aware care tips",
+    free: iconCell(false),
+    premium: iconCell(true)
+  },
+  {
+    feature: "Growth photo timeline",
+    free: iconCell(false),
+    premium: iconCell(true)
+  }
 ];
 
 type PremiumContentProps = {
@@ -118,7 +146,6 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
     }
 
     if (outcome.status === "nothing_to_restore") {
-      // Neutral by design — finding no purchase is not an error.
       setFeedback("No previous purchases were found for this account.");
       return;
     }
@@ -268,7 +295,7 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
         >
           <Text style={styles.termsLink}>Terms</Text>
         </PressableScale>
-        <Text style={styles.termsDivider}>·</Text>
+        <Text style={styles.termsDivider}>|</Text>
         <PressableScale
           accessibilityLabel="Open privacy policy"
           accessibilityRole="link"
@@ -277,7 +304,7 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
         >
           <Text style={styles.termsLink}>Privacy</Text>
         </PressableScale>
-        <Text style={styles.termsDivider}>·</Text>
+        <Text style={styles.termsDivider}>|</Text>
         <PressableScale
           accessibilityLabel="Open subscription management"
           accessibilityRole="link"
@@ -312,12 +339,57 @@ function ComparisonTable() {
       {COMPARISON_ROWS.map((row) => (
         <View key={row.feature} style={styles.tableRow}>
           <Text style={styles.tableFeature}>{row.feature}</Text>
-          <Text style={styles.tableValue}>{row.free}</Text>
-          <Text style={[styles.tableValue, styles.tableValuePremium]}>
-            {row.premium}
-          </Text>
+          <ComparisonValue cell={row.free} feature={row.feature} plan="Free" />
+          <ComparisonValue
+            cell={row.premium}
+            feature={row.feature}
+            isPremiumColumn
+            plan="Premium"
+          />
         </View>
       ))}
+    </View>
+  );
+}
+
+function ComparisonValue({
+  cell,
+  feature,
+  isPremiumColumn = false,
+  plan
+}: {
+  cell: ComparisonCell;
+  feature: string;
+  isPremiumColumn?: boolean;
+  plan: "Free" | "Premium";
+}) {
+  if (cell.type === "text") {
+    return (
+      <Text
+        style={[
+          styles.tableValue,
+          isPremiumColumn ? styles.tableValuePremium : null
+        ]}
+      >
+        {cell.label}
+      </Text>
+    );
+  }
+
+  const label = cell.included ? "included" : "not included";
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${plan} ${feature}: ${label}`}
+      accessibilityRole="image"
+      style={styles.tableValueIcon}
+    >
+      <MaterialCommunityIcons
+        color={cell.included ? theme.colors.leaf : theme.colors.moss}
+        name={cell.included ? "check-circle" : "close-circle-outline"}
+        size={22}
+      />
     </View>
   );
 }
@@ -435,14 +507,14 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right"
   },
+  tableValueIcon: {
+    alignItems: "flex-end",
+    flex: 1,
+    justifyContent: "center"
+  },
   tableValuePremium: {
     color: theme.colors.leaf,
     fontFamily: theme.typography.fontFamily.bodyBold
-  },
-  tableFootnote: {
-    ...theme.text.caption,
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.md
   },
   planSection: {
     gap: theme.spacing.md

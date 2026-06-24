@@ -3,7 +3,7 @@ import type { ExpoConfig } from "expo/config";
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME;
 
 const config: ExpoConfig = {
-  name: "Leaflet",
+  name: "Fernly",
   slug: "leaflet",
   scheme: "leaflet",
   version: "0.1.0",
@@ -36,7 +36,7 @@ const config: ExpoConfig = {
       "expo-location",
       {
         locationWhenInUsePermission:
-          "Leaflet uses your approximate location only to tailor plant care tips to your local weather.",
+          "Fernly uses your approximate location only to tailor plant care tips to your local weather.",
         isAndroidBackgroundLocationEnabled: false
       }
     ],

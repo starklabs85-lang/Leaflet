@@ -34,7 +34,7 @@ export function LegalDocumentScreen({
         <Text style={styles.backText}>Back</Text>
       </PressableScale>
 
-      <Text style={styles.eyebrow}>Leaflet legal</Text>
+      <Text style={styles.eyebrow}>Fernly legal</Text>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.updated}>Last updated {LEGAL_LAST_UPDATED}</Text>
 

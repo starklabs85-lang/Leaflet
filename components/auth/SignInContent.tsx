@@ -7,10 +7,8 @@ import { router } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   StyleSheet,
   Text,
-  TextInput,
   View
 } from "react-native";
 
@@ -19,7 +17,6 @@ import { PlaceholderScreen } from "@/components/PlaceholderScreen";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { LEGAL_ROUTES } from "@/constants/legal";
 import { theme } from "@/constants/theme";
-import { hasDevTestLogin } from "@/lib/env";
 import { useAuth } from "@/providers/AuthProvider";
 
 type SignInContentProps = {
@@ -29,30 +26,16 @@ type SignInContentProps = {
   title: string;
 };
 
-type AuthMode = "sign-in" | "sign-up";
-
 export function SignInContent({
   body,
-  eyebrow = "Leaflet",
+  eyebrow = "Fernly",
   footer,
   title
 }: SignInContentProps) {
   const auth = useAuth();
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [formMessage, setFormMessage] = useState<string | null>(null);
-  const [formMessageType, setFormMessageType] = useState<"error" | "success">(
-    "success"
-  );
   const isMissingConfig = auth.status === "missing-config";
   const isAuthDisabled = auth.isLoading || isMissingConfig;
-  const isEmailLoading =
-    auth.activeProvider === "email-sign-in" ||
-    auth.activeProvider === "email-sign-up";
-  const isSignUp = authMode === "sign-up";
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync()
@@ -62,57 +45,11 @@ export function SignInContent({
 
   useEffect(() => {
     if (auth.errorMessage) {
-      Alert.alert("Leaflet sign-in", getFriendlyAuthError(auth.errorMessage), [
+      Alert.alert("Fernly sign-in", getFriendlyAuthError(auth.errorMessage), [
         { text: "OK", onPress: auth.clearError }
       ]);
     }
   }, [auth.clearError, auth.errorMessage]);
-
-  function switchMode(nextMode: AuthMode) {
-    setAuthMode(nextMode);
-    setConfirmPassword("");
-    setFormMessage(null);
-    auth.clearError();
-  }
-
-  async function submitEmailPassword() {
-    const trimmedEmail = email.trim();
-    const validationError = validateEmailPasswordForm({
-      confirmPassword,
-      email: trimmedEmail,
-      isSignUp,
-      password
-    });
-
-    if (validationError) {
-      setFormMessageType("error");
-      setFormMessage(validationError);
-      return;
-    }
-
-    setFormMessage(null);
-    auth.clearError();
-
-    if (isSignUp) {
-      const result = await auth.signUpWithEmailPassword({
-        email: trimmedEmail,
-        password
-      });
-
-      if (result?.status === "confirmation-required") {
-        setPassword("");
-        setConfirmPassword("");
-        setFormMessageType("success");
-        setFormMessage(`Check ${result.email} to confirm your Leaflet account.`);
-      }
-      return;
-    }
-
-    await auth.signInWithEmailPassword({
-      email: trimmedEmail,
-      password
-    });
-  }
 
   const hero = (
     <LinearGradient
@@ -127,136 +64,6 @@ export function SignInContent({
 
   return (
     <PlaceholderScreen body={body} eyebrow={eyebrow} illustration={hero} title={title}>
-      <View style={styles.emailPanel}>
-        <View style={styles.modeSwitch}>
-          <PressableScale
-            accessibilityLabel="Switch to email sign-in"
-            accessibilityRole="button"
-            accessibilityState={{ selected: authMode === "sign-in" }}
-            disabled={isAuthDisabled}
-            haptic={false}
-            onPress={() => switchMode("sign-in")}
-            style={[
-              styles.modeButton,
-              authMode === "sign-in" ? styles.modeButtonActive : null
-            ]}
-          >
-            <Text
-              style={[
-                styles.modeButtonText,
-                authMode === "sign-in" ? styles.modeButtonTextActive : null
-              ]}
-            >
-              Sign in
-            </Text>
-          </PressableScale>
-          <PressableScale
-            accessibilityLabel="Switch to create account"
-            accessibilityRole="button"
-            accessibilityState={{ selected: authMode === "sign-up" }}
-            disabled={isAuthDisabled}
-            haptic={false}
-            onPress={() => switchMode("sign-up")}
-            style={[
-              styles.modeButton,
-              authMode === "sign-up" ? styles.modeButtonActive : null
-            ]}
-          >
-            <Text
-              style={[
-                styles.modeButtonText,
-                authMode === "sign-up" ? styles.modeButtonTextActive : null
-              ]}
-            >
-              Create account
-            </Text>
-          </PressableScale>
-        </View>
-
-        <TextInput
-          accessibilityLabel="Email address"
-          autoCapitalize="none"
-          autoComplete="email"
-          autoCorrect={false}
-          editable={!isAuthDisabled}
-          inputMode="email"
-          keyboardType="email-address"
-          onChangeText={setEmail}
-          placeholder="Email address"
-          placeholderTextColor={theme.colors.moss}
-          returnKeyType="next"
-          style={[styles.input, isAuthDisabled && styles.disabled]}
-          textContentType="emailAddress"
-          value={email}
-        />
-        <TextInput
-          accessibilityLabel="Password"
-          autoCapitalize="none"
-          autoComplete={isSignUp ? "new-password" : "password"}
-          editable={!isAuthDisabled}
-          onChangeText={setPassword}
-          onSubmitEditing={isSignUp ? () => undefined : submitEmailPassword}
-          placeholder="Password"
-          placeholderTextColor={theme.colors.moss}
-          returnKeyType={isSignUp ? "next" : "done"}
-          secureTextEntry
-          style={[styles.input, isAuthDisabled && styles.disabled]}
-          textContentType={isSignUp ? "newPassword" : "password"}
-          value={password}
-        />
-        {isSignUp ? (
-          <TextInput
-            accessibilityLabel="Confirm password"
-            autoCapitalize="none"
-            autoComplete="new-password"
-            editable={!isAuthDisabled}
-            onChangeText={setConfirmPassword}
-            onSubmitEditing={submitEmailPassword}
-            placeholder="Confirm password"
-            placeholderTextColor={theme.colors.moss}
-            returnKeyType="done"
-            secureTextEntry
-            style={[styles.input, isAuthDisabled && styles.disabled]}
-            textContentType="newPassword"
-            value={confirmPassword}
-          />
-        ) : null}
-
-        <PressableScale
-          accessibilityLabel={isSignUp ? "Create Leaflet account" : "Sign in with email"}
-          accessibilityRole="button"
-          accessibilityState={{ busy: isEmailLoading, disabled: isAuthDisabled }}
-          disabled={isAuthDisabled}
-          onPress={submitEmailPassword}
-          style={[styles.emailButton, isAuthDisabled && styles.disabled]}
-        >
-          {isEmailLoading ? (
-            <ActivityIndicator color={theme.colors.white} />
-          ) : (
-            <Text style={styles.emailButtonText}>
-              {isSignUp ? "Create account" : "Sign in with email"}
-            </Text>
-          )}
-        </PressableScale>
-
-        {formMessage ? (
-          <Text
-            style={[
-              styles.formMessage,
-              formMessageType === "error" ? styles.formMessageError : null
-            ]}
-          >
-            {formMessage}
-          </Text>
-        ) : (
-          <Text style={styles.formMessage}>
-            New accounts may require email confirmation before sign-in.
-          </Text>
-        )}
-      </View>
-
-      <Text style={styles.oauthDivider}>Or continue with</Text>
-
       {isAppleAvailable ? (
         <AppleAuthentication.AppleAuthenticationButton
           buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
@@ -265,13 +72,7 @@ export function SignInContent({
           onPress={isAuthDisabled ? () => undefined : auth.signInWithApple}
           style={[styles.appleButton, isAuthDisabled && styles.disabled]}
         />
-      ) : (
-        <View style={styles.unavailableCard}>
-          <Text style={styles.unavailableText}>
-            Apple sign-in is available on supported iOS devices.
-          </Text>
-        </View>
-      )}
+      ) : null}
 
       <PressableScale
         accessibilityLabel="Continue with Google"
@@ -294,25 +95,8 @@ export function SignInContent({
         )}
       </PressableScale>
 
-      {hasDevTestLogin() ? (
-        <PressableScale
-          accessibilityLabel="Dev test login"
-          accessibilityRole="button"
-          disabled={isAuthDisabled}
-          onPress={auth.signInWithDevTest}
-          style={[styles.devButton, isAuthDisabled && styles.disabled]}
-        >
-          {auth.activeProvider === "dev" ? (
-            <ActivityIndicator color={theme.colors.white} />
-          ) : (
-            <Text style={styles.devButtonText}>Dev test login (bypass OAuth)</Text>
-          )}
-        </PressableScale>
-      ) : null}
-
       <Text style={styles.helperText}>
-        By continuing, you agree to Leaflet's Terms and Privacy Policy. Plant
-        photos you scan are processed in the cloud with Supabase and OpenAI.
+        By continuing, you agree to Fernly's Terms and Privacy Policy.
       </Text>
 
       <View style={styles.legalRow}>
@@ -341,48 +125,9 @@ export function SignInContent({
           {getFriendlyAuthError(auth.errorMessage)}
         </Text>
       ) : null}
-      {Platform.OS !== "ios" ? (
-        <Text style={styles.helperText}>
-          Apple sign-in will appear on supported iOS devices.
-        </Text>
-      ) : null}
       {footer}
     </PlaceholderScreen>
   );
-}
-
-function validateEmailPasswordForm({
-  confirmPassword,
-  email,
-  isSignUp,
-  password
-}: {
-  confirmPassword: string;
-  email: string;
-  isSignUp: boolean;
-  password: string;
-}) {
-  if (!email) {
-    return "Enter your email address.";
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return "Enter a valid email address.";
-  }
-
-  if (!password) {
-    return "Enter your password.";
-  }
-
-  if (isSignUp && password.length < 6) {
-    return "Use at least 6 characters for your password.";
-  }
-
-  if (isSignUp && password !== confirmPassword) {
-    return "Passwords do not match.";
-  }
-
-  return null;
 }
 
 function getFriendlyAuthError(message: string) {
@@ -417,7 +162,7 @@ function getFriendlyAuthError(message: string) {
     normalized.includes("fetch") ||
     normalized.includes("timeout")
   ) {
-    return "Leaflet could not reach the sign-in service. Check your connection and try again.";
+    return "Fernly could not reach the sign-in service. Check your connection and try again.";
   }
 
   if (normalized.includes("cancel")) {
@@ -530,15 +275,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bodyBold,
     fontSize: theme.typography.body
   },
-  unavailableCard: {
-    backgroundColor: theme.colors.leafMuted,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md
-  },
-  unavailableText: {
-    ...theme.text.caption,
-    lineHeight: 18
-  },
   helperText: {
     ...theme.text.caption,
     lineHeight: 18,
@@ -569,20 +305,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: theme.spacing.md,
     textAlign: "center"
-  },
-  devButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.forest,
-    borderRadius: theme.radius.lg,
-    height: 54,
-    justifyContent: "center",
-    marginTop: theme.spacing.md,
-    width: "100%"
-  },
-  devButtonText: {
-    color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.bodyBold,
-    fontSize: theme.typography.body
   },
   disabled: {
     opacity: 0.6

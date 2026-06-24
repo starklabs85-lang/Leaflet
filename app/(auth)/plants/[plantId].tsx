@@ -19,6 +19,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { UpgradePrompt } from "@/components/payments/UpgradePrompt";
 import { PlantEnvironmentFields } from "@/components/plants/PlantEnvironmentFields";
 import { PlantImage } from "@/components/ui/PlantImage";
@@ -89,6 +90,22 @@ const QUICK_LOG_ACTIONS: CareLogType[] = [
 ];
 
 export default function PlantDetailScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Plant details require Premium"
+        message="Plant profiles, care tasks, diagnosis history, weather notes, and growth photos are included with Premium."
+        icon="leaf-circle-outline"
+      />
+    );
+  }
+
+  return <PremiumPlantDetailScreen />;
+}
+
+function PremiumPlantDetailScreen() {
   const params = useLocalSearchParams<{ plantId?: string | string[] }>();
   const plantId = Array.isArray(params.plantId) ? params.plantId[0] : params.plantId;
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });

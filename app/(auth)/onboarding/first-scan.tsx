@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -44,21 +43,9 @@ export default function FirstScanPromptScreen() {
       <Text style={styles.eyebrow}>Step 4 of 5</Text>
       <Text style={styles.title}>Let's scan your first plant!</Text>
       <Text style={styles.body}>
-        Point your camera at a houseplant - Leaflet will identify it and build a
+        Point your camera at a houseplant - Fernly will identify it and build a
         care plan from the result.
       </Text>
-
-      <View style={styles.consentBox}>
-        <MaterialCommunityIcons
-          color={theme.colors.forest}
-          name="cloud-check-outline"
-          size={22}
-        />
-        <Text style={styles.consentText}>
-          Scan photos are sent securely to Supabase and OpenAI for cloud AI
-          processing. Avoid including people, documents, or private spaces.
-        </Text>
-      </View>
 
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
@@ -97,22 +84,6 @@ const styles = StyleSheet.create({
     ...theme.text.body,
     color: theme.colors.moss,
     marginTop: theme.spacing.md
-  },
-  consentBox: {
-    alignItems: "flex-start",
-    backgroundColor: theme.colors.leafMuted,
-    borderRadius: theme.radius.card,
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.xl,
-    padding: theme.spacing.lg
-  },
-  consentText: {
-    ...theme.text.body,
-    color: theme.colors.forest,
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 21
   },
   message: {
     color: theme.colors.terra,

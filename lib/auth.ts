@@ -2,19 +2,10 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import { Platform } from "react-native";
 
-import { env, getGoogleConfigIssue, hasDevTestLogin, hasGoogleConfig } from "@/lib/env";
+import { env, getGoogleConfigIssue, hasGoogleConfig } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
 
 type GoogleSignInModule = typeof import("@react-native-google-signin/google-signin");
-
-export type EmailPasswordCredentials = {
-  email: string;
-  password: string;
-};
-
-export type EmailPasswordSignUpResult =
-  | { status: "signed-in" }
-  | { status: "confirmation-required"; email: string };
 
 let googleSignInModule: GoogleSignInModule | null = null;
 let googleConfigured = false;
@@ -39,7 +30,7 @@ async function getGoogleSignInModule() {
     return googleSignInModule;
   } catch {
     throw new Error(
-      "Google sign-in requires a Leaflet development build. Open the app with the Leaflet dev client instead of Expo Go."
+      "Google sign-in requires a Fernly development build. Open the app with the Fernly dev client instead of Expo Go."
     );
   }
 }
@@ -156,85 +147,6 @@ export async function signInWithGoogleIdToken() {
   return { cancelled: false };
 }
 
-export async function signInWithEmailPassword({
-  email,
-  password
-}: EmailPasswordCredentials) {
-  const { error } = await getSupabaseClient().auth.signInWithPassword({
-    email: normalizeEmail(email),
-    password
-  });
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function signUpWithEmailPassword({
-  email,
-  password
-}: EmailPasswordCredentials): Promise<EmailPasswordSignUpResult> {
-  const normalizedEmail = normalizeEmail(email);
-  const { data, error } = await getSupabaseClient().auth.signUp({
-    email: normalizedEmail,
-    password
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  if (data.session) {
-    return { status: "signed-in" };
-  }
-
-  return { status: "confirmation-required", email: normalizedEmail };
-}
-
-// Dev-only bypass: sign in with a Supabase email/password test account so the
-// rest of the app can be exercised with a real session (RLS/data all work)
-// while native Google/Apple sign-in is being fixed. Stripped from prod by the
-// __DEV__ guard in hasDevTestLogin() and by the button only rendering in dev.
-export async function signInWithDevTestAccount() {
-  if (!hasDevTestLogin()) {
-    throw new Error(
-      "Dev test login is not configured. Set EXPO_PUBLIC_DEV_TEST_EMAIL and EXPO_PUBLIC_DEV_TEST_PASSWORD in .env."
-    );
-  }
-
-  const supabase = getSupabaseClient();
-  const credentials = {
-    email: env.devTestEmail,
-    password: env.devTestPassword
-  };
-
-  const { error } = await supabase.auth.signInWithPassword(credentials);
-
-  if (!error) {
-    return;
-  }
-
-  // First run: the user may not exist yet. Try to create it. This only yields
-  // a usable session if email confirmation is disabled for the project.
-  const isInvalidLogin = error.message.toLowerCase().includes("invalid login");
-
-  if (!isInvalidLogin) {
-    throw error;
-  }
-
-  const { data, error: signUpError } = await supabase.auth.signUp(credentials);
-
-  if (signUpError) {
-    throw signUpError;
-  }
-
-  if (!data.session) {
-    throw new Error(
-      "Created the test user, but Supabase requires email confirmation. Disable confirmation, or add a confirmed user in Authentication → Users, then retry."
-    );
-  }
-}
-
 export async function signOutOfNativeProviders() {
   try {
     if (!googleConfigured) {
@@ -249,8 +161,4 @@ export async function signOutOfNativeProviders() {
   } catch {
     // Supabase sign-out is the source of truth. Native provider cleanup is best-effort.
   }
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
 }

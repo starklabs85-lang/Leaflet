@@ -60,7 +60,7 @@ export default function RootLayout() {
   // Hold briefly for brand fonts, then render with system fallback instead of
   // leaving users on a blank native splash if font loading stalls.
   if (!canRender) {
-    return <LoadingScreen message="Loading Leaflet..." />;
+    return <LoadingScreen message="Loading Fernly..." />;
   }
 
   return (
@@ -134,11 +134,12 @@ function getPendingAuthRedirect(
   const isAuthenticated = authStatus === "authenticated";
   const isAuthOnboardingRoute =
     routeSegments[0] === "(auth)" && routeSegments[1] === "onboarding";
-  const isFirstPlantLoopRoute =
+  const isOnboardingScanRoute =
     routeSegments[0] === "(auth)" &&
-    ((routeSegments[1] === "(tabs)" && routeSegments[2] === "scan") ||
-      (routeSegments[1] === "plants" && routeSegments[2] === "save") ||
-      routeSegments[1] === "species");
+    routeSegments[1] === "(tabs)" &&
+    routeSegments[2] === "scan";
+  const isOnboardingPremiumRoute =
+    routeSegments[0] === "(auth)" && routeSegments[1] === "premium";
 
   if (!isAuthenticated && !isPublicRoute) {
     return onboardingStatus === "needs_onboarding"
@@ -149,7 +150,8 @@ function getPendingAuthRedirect(
   if (
     isAuthenticated &&
     onboardingStatus === "needs_onboarding" &&
-    (isPublicRoute || (!isAuthOnboardingRoute && !isFirstPlantLoopRoute))
+    (isPublicRoute ||
+      (!isAuthOnboardingRoute && !isOnboardingScanRoute && !isOnboardingPremiumRoute))
   ) {
     return "/(auth)/onboarding/first-scan";
   }
@@ -164,7 +166,7 @@ function getPendingAuthRedirect(
 function LoadingScreen({ message }: { message: string }) {
   return (
     <View style={styles.loadingScreen}>
-      <Text style={styles.loadingEyebrow}>Leaflet</Text>
+      <Text style={styles.loadingEyebrow}>Fernly</Text>
       <Text style={styles.loadingText}>{message}</Text>
       <StatusBar style="dark" />
     </View>

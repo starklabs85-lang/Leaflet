@@ -148,7 +148,7 @@ export default function ProfileScreen() {
           icon={entitlement.isPremium ? "leaf-circle" : "leaf-circle-outline"}
           onPress={() => router.push("/(auth)/premium" as never)}
           title={
-            entitlement.isPremium ? "Leaflet Premium — active" : "Upgrade to Premium"
+            entitlement.isPremium ? "Fernly Premium active" : "Upgrade to Premium"
           }
         />
         <View style={styles.divider} />
@@ -261,7 +261,7 @@ export default function ProfileScreen() {
       ) : null}
 
       <PressableScale
-        accessibilityLabel="Sign out of Leaflet"
+        accessibilityLabel="Sign out of Fernly"
         accessibilityRole="button"
         accessibilityState={{ disabled: auth.isLoading }}
         disabled={auth.isLoading}
@@ -282,7 +282,7 @@ export default function ProfileScreen() {
         )}
       </PressableScale>
 
-      <Text style={styles.versionText}>Leaflet · Beta</Text>
+      <Text style={styles.versionText}>Fernly Beta</Text>
     </Screen>
   );
 }

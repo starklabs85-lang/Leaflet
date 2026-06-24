@@ -195,7 +195,7 @@ export function TodayNearYou({
           <Text style={styles.setupTitle}>Care tips for your weather</Text>
         </View>
         <Text style={styles.setupBody}>
-          Allow location so Leaflet can tailor care to your local weather — frost
+          Allow location so Fernly can tailor care to your local weather - frost
           warnings, rainy-day watering skips, and heat-wave checks. Your location
           stays coarse and is used only for weather.
         </Text>

@@ -1,17 +1,13 @@
 import { getSupabaseClient } from "@/lib/supabase";
 
 /**
- * Phase 12 free-tier limits. The identify/diagnose caps are enforced
- * server-side in the identify-plant edge function (which reads the
- * `subscriptions` table); these client checks exist so users see a friendly
- * inline prompt before a request is wasted. Collection and growth-photo caps
- * are enforced here at the save points.
+ * Free-tier product limits. The identify cap is enforced server-side in the
+ * identify-plant edge function (which reads the `subscriptions` table); these
+ * client checks exist so users see a friendly inline prompt before a request
+ * is wasted. Other product features are Premium-only at their entry points.
  */
 export const FREE_LIMITS = {
-  identifyScansPerDay: 5,
-  diagnoseScansPerDay: 3,
-  plantsInCollection: 10,
-  growthPhotosPerPlantPerMonth: 1
+  identifyScansPerDay: 1
 } as const;
 
 export type LimitCheck =
@@ -40,7 +36,7 @@ export async function checkIdentifyScanAllowance(
     return {
       allowed: false,
       remaining: 0,
-      message: `You've used your ${FREE_LIMITS.identifyScansPerDay} free identify scans today. Upgrade to Premium for unlimited scans.`
+      message: "You've used your free plant scan today. Upgrade to Premium for unlimited scans."
     };
   }
 
@@ -54,23 +50,11 @@ export async function checkDiagnoseScanAllowance(
     return UNLIMITED;
   }
 
-  const usage = await getDailyScanUsage();
-
-  if (!usage) {
-    return { allowed: true, remaining: null };
-  }
-
-  const remaining = FREE_LIMITS.diagnoseScansPerDay - usage.diagnoseCount;
-
-  if (remaining <= 0) {
-    return {
-      allowed: false,
-      remaining: 0,
-      message: `You've used your ${FREE_LIMITS.diagnoseScansPerDay} free diagnosis scans today. Upgrade to Premium for unlimited diagnoses.`
-    };
-  }
-
-  return { allowed: true, remaining };
+  return {
+    allowed: false,
+    remaining: 0,
+    message: "Disease diagnosis is included with Premium."
+  };
 }
 
 export async function checkCollectionAllowance(
@@ -80,30 +64,15 @@ export async function checkCollectionAllowance(
     return UNLIMITED;
   }
 
-  const { count, error } = await getSupabaseClient()
-    .from("user_plants")
-    .select("id", { count: "exact", head: true });
-
-  if (error || count === null) {
-    return { allowed: true, remaining: null };
-  }
-
-  const remaining = FREE_LIMITS.plantsInCollection - count;
-
-  if (remaining <= 0) {
-    return {
-      allowed: false,
-      remaining: 0,
-      message: `Free accounts can track up to ${FREE_LIMITS.plantsInCollection} plants. Upgrade to Premium for an unlimited collection.`
-    };
-  }
-
-  return { allowed: true, remaining };
+  return {
+    allowed: false,
+    remaining: 0,
+    message: "Saving plants and building a collection are included with Premium."
+  };
 }
 
 export async function checkGrowthPhotoAllowance({
-  isPremium,
-  userPlantId
+  isPremium
 }: {
   isPremium: boolean;
   userPlantId: string;
@@ -112,32 +81,11 @@ export async function checkGrowthPhotoAllowance({
     return UNLIMITED;
   }
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const { count, error } = await getSupabaseClient()
-    .from("care_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("user_plant_id", userPlantId)
-    .eq("task_type", "growth_photo")
-    .gte("logged_at", monthStart.toISOString());
-
-  if (error || count === null) {
-    return { allowed: true, remaining: null };
-  }
-
-  const remaining = FREE_LIMITS.growthPhotosPerPlantPerMonth - count;
-
-  if (remaining <= 0) {
-    return {
-      allowed: false,
-      remaining: 0,
-      message:
-        "Free accounts can add 1 growth photo per plant each month. Upgrade to Premium for an unlimited timeline."
-    };
-  }
-
-  return { allowed: true, remaining };
+  return {
+    allowed: false,
+    remaining: 0,
+    message: "Growth photos are included with Premium."
+  };
 }
 
 /** Count of plants in the user's collection (used for the first-plant trial trigger). */

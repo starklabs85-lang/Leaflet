@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -13,6 +14,7 @@ import { PressableScale } from "@/components/ui/PressableScale";
 import { Screen } from "@/components/ui/Screen";
 import { theme } from "@/constants/theme";
 import { fetchSpeciesProfile } from "@/lib/api/speciesProfile";
+import { useEntitlement } from "@/providers/EntitlementProvider";
 import type {
   CareDifficulty,
   SpeciesProfile,
@@ -45,6 +47,22 @@ const CARE_CARDS: {
 ];
 
 export default function SpeciesInfoScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Care info requires Premium"
+        message="Detailed species profiles and care guidance are included with Premium. Your free tier still includes one plant identification scan per day."
+        icon="book-open-variant"
+      />
+    );
+  }
+
+  return <PremiumSpeciesInfoScreen />;
+}
+
+function PremiumSpeciesInfoScreen() {
   const params = useLocalSearchParams<{ speciesId?: string | string[] }>();
   const speciesId = Array.isArray(params.speciesId)
     ? params.speciesId[0]

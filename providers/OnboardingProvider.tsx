@@ -23,6 +23,7 @@ type OnboardingStatus = "loading" | "needs_onboarding" | "skipped" | "complete";
 
 type OnboardingContextValue = {
   activationContext: OnboardingActivationContext | null;
+  completeAfterFreeScan: () => Promise<void>;
   completeAfterPlantSave: (
     context: Omit<OnboardingActivationContext, "completedAt">
   ) => Promise<boolean>;
@@ -118,9 +119,21 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     [status]
   );
 
+  const completeAfterFreeScan = useCallback(async () => {
+    await Promise.all([
+      secureStorageAdapter.setItem(ONBOARDING_COMPLETE_KEY, "true"),
+      secureStorageAdapter.removeItem(ONBOARDING_SKIPPED_KEY),
+      secureStorageAdapter.removeItem(ONBOARDING_ACTIVATION_KEY)
+    ]);
+
+    setActivationContext(null);
+    setStatus("complete");
+  }, []);
+
   const value = useMemo<OnboardingContextValue>(
     () => ({
       activationContext,
+      completeAfterFreeScan,
       completeAfterPlantSave,
       intent,
       isComplete: status === "complete",
@@ -132,6 +145,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     }),
     [
       activationContext,
+      completeAfterFreeScan,
       completeAfterPlantSave,
       intent,
       refresh,

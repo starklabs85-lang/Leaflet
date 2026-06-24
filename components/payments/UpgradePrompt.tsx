@@ -9,6 +9,7 @@ type UpgradePromptProps = {
   title?: string;
   message: string;
   onDismiss: () => void;
+  onUpgrade?: () => void;
   dismissLabel?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -22,6 +23,7 @@ export function UpgradePrompt({
   title = "You've hit today's free limit",
   message,
   onDismiss,
+  onUpgrade,
   dismissLabel = "Maybe later",
   style
 }: UpgradePromptProps) {
@@ -46,12 +48,12 @@ export function UpgradePrompt({
           variant="secondary"
         />
         <Button
-          accessibilityLabel="See Leaflet Premium"
+          accessibilityLabel="See Fernly Premium"
           fullWidth={false}
           gradient
           icon="arrow-up-circle-outline"
           label="Upgrade"
-          onPress={() => router.push("/(auth)/premium" as never)}
+          onPress={onUpgrade ?? (() => router.push("/(auth)/premium" as never))}
           style={styles.action}
         />
       </View>
