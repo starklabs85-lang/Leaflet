@@ -57,6 +57,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="tasks"
+        options={{
+          title: "Today",
+          tabBarAccessibilityLabel: "Today tab",
+          tabBarIcon: tabIcon("calendar-check", "calendar-check-outline")
+        }}
+      />
+      <Tabs.Screen
         name="scan"
         options={{
           title: "Scan",
