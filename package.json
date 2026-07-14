@@ -11,7 +11,8 @@
     "build:dev:ios": "eas build --profile development --platform ios",
     "build:dev:ios-device": "eas build --profile development-device --platform ios",
     "build:dev:android": "eas build --profile development --platform android",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:app-review": "node --test scripts/app-review-remediation.test.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/fredoka": "^0.4.1",

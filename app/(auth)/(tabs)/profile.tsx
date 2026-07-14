@@ -8,6 +8,7 @@ import {
   View
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import type { User } from "@supabase/supabase-js";
 
@@ -47,6 +48,8 @@ import { useEntitlement } from "@/providers/EntitlementProvider";
 export default function ProfileScreen() {
   const auth = useAuth();
   const entitlement = useEntitlement();
+  const nativeVersion =
+    Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? "1.0";
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -423,7 +426,7 @@ export default function ProfileScreen() {
         )}
       </PressableScale>
 
-      <Text style={styles.versionText}>Fernly Beta</Text>
+      <Text style={styles.versionText}>Fernly {nativeVersion}</Text>
     </Screen>
   );
 }
