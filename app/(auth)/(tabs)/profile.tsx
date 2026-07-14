@@ -8,10 +8,12 @@ import {
   View
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import type { User } from "@supabase/supabase-js";
 
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { GradientHeader } from "@/components/ui/GradientHeader";
 import { IconChip } from "@/components/ui/IconChip";
 import {
@@ -41,12 +43,23 @@ import {
   isWeatherAlertsEnabled,
   setWeatherAlertsEnabled
 } from "@/lib/notifications/weatherAlerts";
+import { isProfileTrialEligible } from "@/lib/payments/profileTrialCta";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEntitlement } from "@/providers/EntitlementProvider";
 
 export default function ProfileScreen() {
   const auth = useAuth();
   const entitlement = useEntitlement();
+  const nativeVersion =
+    Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? "1.0";
+  const hasProfileTrial = isProfileTrialEligible({
+    annualProductId: entitlement.annualPackage?.product.identifier,
+    monthlyProductId: entitlement.monthlyPackage?.product.identifier,
+    trialEligibilityByProductId: entitlement.trialEligibilityByProductId
+  });
+  const profilePremiumCtaLabel = hasProfileTrial
+    ? "Start 7-day free trial"
+    : "Upgrade to Premium";
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -178,6 +191,13 @@ export default function ProfileScreen() {
     );
   }
 
+  function openPremium() {
+    void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+      source: "profile_membership"
+    });
+    router.push("/(auth)/premium" as never);
+  }
+
   function confirmDeleteAccount() {
     if (isDeletingAccount) {
       return;
@@ -225,19 +245,26 @@ export default function ProfileScreen() {
     >
       <Text style={styles.sectionLabel}>Membership</Text>
       <Card padded={false} style={styles.card}>
-        <SettingsLinkRow
-          icon={entitlement.isPremium ? "leaf-circle" : "leaf-circle-outline"}
-          onPress={() => {
-            void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
-              source: "profile_membership"
-            });
-            router.push("/(auth)/premium" as never);
-          }}
-          title={
-            entitlement.isPremium ? "Fernly Premium active" : "Upgrade to Premium"
-          }
+        {entitlement.isPremium ? (
+          <SettingsLinkRow
+            icon="leaf-circle"
+            onPress={openPremium}
+            title="Fernly Premium active"
+          />
+        ) : (
+          <View style={styles.membershipCta}>
+            <Button
+              accessibilityLabel={profilePremiumCtaLabel}
+              gradient
+              icon="leaf"
+              label={profilePremiumCtaLabel}
+              onPress={openPremium}
+            />
+          </View>
+        )}
+        <View
+          style={entitlement.isPremium ? styles.divider : styles.dividerFull}
         />
-        <View style={styles.divider} />
         <SettingsLinkRow
           icon="restore"
           onPress={restorePurchases}
@@ -597,6 +624,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.line,
     height: 1,
     marginLeft: 60 + theme.spacing.lg
+  },
+  dividerFull: {
+    backgroundColor: theme.colors.line,
+    height: 1
+  },
+  membershipCta: {
+    padding: theme.spacing.md
   },
   errorText: {
     color: theme.colors.terra,
