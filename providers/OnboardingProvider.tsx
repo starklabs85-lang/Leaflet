@@ -9,6 +9,10 @@ import {
 } from "react";
 
 import { secureStorageAdapter } from "@/lib/secure-storage";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 
 export type OnboardingIntent = "new_plant_parent" | "growing_collector";
 
@@ -23,6 +27,7 @@ type OnboardingStatus = "loading" | "needs_onboarding" | "skipped" | "complete";
 
 type OnboardingContextValue = {
   activationContext: OnboardingActivationContext | null;
+  completeAfterFreeScan: () => Promise<void>;
   completeAfterPlantSave: (
     context: Omit<OnboardingActivationContext, "completedAt">
   ) => Promise<boolean>;
@@ -84,11 +89,15 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
   const setIntent = useCallback(async (nextIntent: OnboardingIntent) => {
     setStoredIntent(nextIntent);
     await secureStorageAdapter.setItem(ONBOARDING_INTENT_KEY, nextIntent);
+    void trackAction(ANALYTICS_EVENTS.ONBOARDING_INTENT_SELECT, {
+      intent: nextIntent
+    });
   }, []);
 
   const skip = useCallback(async () => {
     await secureStorageAdapter.setItem(ONBOARDING_SKIPPED_KEY, "true");
     setStatus("skipped");
+    void trackAction(ANALYTICS_EVENTS.ONBOARDING_SKIP);
   }, []);
 
   const completeAfterPlantSave = useCallback(
@@ -112,15 +121,33 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
 
       setActivationContext(nextContext);
       setStatus("complete");
+      void trackAction(ANALYTICS_EVENTS.ONBOARDING_COMPLETE, {
+        method: "plant_save"
+      });
 
       return !wasComplete;
     },
     [status]
   );
 
+  const completeAfterFreeScan = useCallback(async () => {
+    await Promise.all([
+      secureStorageAdapter.setItem(ONBOARDING_COMPLETE_KEY, "true"),
+      secureStorageAdapter.removeItem(ONBOARDING_SKIPPED_KEY),
+      secureStorageAdapter.removeItem(ONBOARDING_ACTIVATION_KEY)
+    ]);
+
+    setActivationContext(null);
+    setStatus("complete");
+    void trackAction(ANALYTICS_EVENTS.ONBOARDING_COMPLETE, {
+      method: "free_scan"
+    });
+  }, []);
+
   const value = useMemo<OnboardingContextValue>(
     () => ({
       activationContext,
+      completeAfterFreeScan,
       completeAfterPlantSave,
       intent,
       isComplete: status === "complete",
@@ -132,6 +159,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     }),
     [
       activationContext,
+      completeAfterFreeScan,
       completeAfterPlantSave,
       intent,
       refresh,

@@ -9,10 +9,8 @@ import { Screen } from "@/components/ui/Screen";
 import { theme } from "@/constants/theme";
 
 /**
- * One-time trial introduction, shown exactly once right after the user saves
- * their first plant (the flag is set before navigating here). Framed as a
- * celebration; "Continue with free" carries equal weight and simply moves the
- * user along to wherever the save flow was headed.
+ * One-time trial introduction, shown after the first meaningful Premium
+ * moment. "Continue with free" keeps the user in the locked app shell.
  */
 export default function PremiumIntroScreen() {
   const insets = useSafeAreaInsets();
@@ -52,8 +50,8 @@ export default function PremiumIntroScreen() {
           ]}
         >
           <Button
-            accessibilityLabel="Continue with the free plan"
-            label="Continue with free"
+            accessibilityLabel="Continue without Premium"
+            label="Continue without Premium"
             onPress={continueOnward}
             variant="secondary"
           />
@@ -68,11 +66,11 @@ export default function PremiumIntroScreen() {
         {plantName ? `${plantName} is in! 🌿` : "Your first plant is in! 🌿"}
       </Text>
       <Text style={styles.subtitle}>
-        Here's everything Leaflet can do for it. The free plan is yours forever —
-        Premium just removes the caps when your collection grows.
+        Premium unlocks saved plants, diagnosis, care info, reminders, weather
+        tips, and growth photos.
       </Text>
 
-      <PremiumContent onPurchased={continueOnward} />
+      <PremiumContent onPurchased={continueOnward} source="premium_intro" />
     </Screen>
   );
 }

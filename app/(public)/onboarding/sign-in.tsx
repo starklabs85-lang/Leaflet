@@ -17,7 +17,7 @@ export default function OnboardingSignInScreen() {
     <SignInContent
       eyebrow="Step 3 of 5"
       title="Sign in to save your first plant."
-      body="Leaflet needs sign-in before scan results, photos, care tasks, and diagnosis history can be saved securely."
+      body="Fernly needs sign-in before scan results, photos, care tasks, and diagnosis history can be saved securely."
       footer={
         <Pressable
           accessibilityLabel="Skip onboarding and continue on the normal sign-in screen"

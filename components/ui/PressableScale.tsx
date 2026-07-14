@@ -8,8 +8,20 @@ import {
   type ViewStyle
 } from "react-native";
 
-type PressableScaleProps = Omit<PressableProps, "style"> & {
+import {
+  trackTap,
+  type AnalyticsParams,
+  type AnalyticsTapName
+} from "@/lib/analytics/firebaseAnalytics";
+
+export type PressableAnalytics = {
+  params?: AnalyticsParams | (() => AnalyticsParams);
+  tapName: AnalyticsTapName;
+};
+
+export type PressableScaleProps = Omit<PressableProps, "style"> & {
   style?: StyleProp<ViewStyle>;
+  analytics?: PressableAnalytics;
   /** Style applied to the animated wrapper (e.g. margins, alignSelf). */
   containerStyle?: StyleProp<ViewStyle>;
   /** Scale value at the bottom of the press. */
@@ -25,6 +37,7 @@ type PressableScaleProps = Omit<PressableProps, "style"> & {
  * Built on the core Animated API — no reanimated dependency required.
  */
 export function PressableScale({
+  analytics,
   style,
   containerStyle,
   scaleTo = 0.97,
@@ -64,6 +77,14 @@ export function PressableScale({
         onPress={(event) => {
           if (haptic && !disabled) {
             Haptics.impactAsync(hapticStyle).catch(() => undefined);
+          }
+          if (analytics && !disabled) {
+            const params =
+              typeof analytics.params === "function"
+                ? analytics.params()
+                : analytics.params;
+
+            void trackTap(analytics.tapName, params);
           }
           onPress?.(event);
         }}

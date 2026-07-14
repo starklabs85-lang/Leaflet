@@ -24,10 +24,12 @@ import {
   isEligibleForIntroTrial,
   logInPurchases,
   logOutPurchases,
+  presentSubscriptionOfferCodeRedemption,
   purchasePremiumPackage,
   restorePremiumPurchases,
   toEntitlementSnapshot,
   type EntitlementSnapshot,
+  type OfferCodeRedemptionOutcome,
   type PurchaseOutcome,
   type RestoreOutcome
 } from "@/lib/payments/revenuecat";
@@ -38,9 +40,10 @@ type EntitlementContextValue = EntitlementSnapshot & {
   offering: PurchasesOffering | null;
   monthlyPackage: PurchasesPackage | null;
   annualPackage: PurchasesPackage | null;
-  isTrialEligible: boolean;
+  trialEligibilityByProductId: Record<string, boolean>;
   purchase: (pkg: PurchasesPackage) => Promise<PurchaseOutcome>;
   restore: () => Promise<RestoreOutcome>;
+  redeemOfferCode: () => Promise<OfferCodeRedemptionOutcome>;
   refresh: () => Promise<void>;
 };
 
@@ -57,7 +60,8 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
   const [snapshot, setSnapshot] = useState<EntitlementSnapshot>(FREE_ENTITLEMENT);
   const [isLoading, setIsLoading] = useState(true);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
-  const [isTrialEligible, setIsTrialEligible] = useState(false);
+  const [trialEligibilityByProductId, setTrialEligibilityByProductId] =
+    useState<Record<string, boolean>>({});
   const lastSyncedUserIdRef = useRef<string | null>(null);
 
   const applyCustomerInfo = useCallback((customerInfo: CustomerInfo | null) => {
@@ -122,10 +126,20 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
 
           const annual = currentOffering?.annual ?? null;
           const monthly = currentOffering?.monthly ?? null;
-          const eligible = await isEligibleForIntroTrial(monthly ?? annual);
+          const packages = [monthly, annual].filter(
+            (pkg): pkg is PurchasesPackage => Boolean(pkg)
+          );
+          const eligibilityEntries = await Promise.all(
+            packages.map(async (pkg) => [
+              pkg.product.identifier,
+              await isEligibleForIntroTrial(pkg)
+            ] as const)
+          );
 
           if (isActive) {
-            setIsTrialEligible(eligible);
+            setTrialEligibilityByProductId(
+              Object.fromEntries(eligibilityEntries)
+            );
           }
         } else {
           lastSyncedUserIdRef.current = null;
@@ -134,7 +148,7 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
           if (isActive) {
             setSnapshot(FREE_ENTITLEMENT);
             setOffering(null);
-            setIsTrialEligible(false);
+            setTrialEligibilityByProductId({});
           }
         }
       } catch {
@@ -177,6 +191,16 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
     return outcome;
   }, [applyCustomerInfo]);
 
+  const redeemOfferCode = useCallback(async () => {
+    const outcome = await presentSubscriptionOfferCodeRedemption();
+
+    if (outcome.status === "presented") {
+      await refresh();
+    }
+
+    return outcome;
+  }, [refresh]);
+
   const value = useMemo<EntitlementContextValue>(
     () => ({
       ...snapshot,
@@ -184,12 +208,22 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
       offering,
       monthlyPackage: offering?.monthly ?? null,
       annualPackage: offering?.annual ?? null,
-      isTrialEligible,
+      trialEligibilityByProductId,
       purchase,
       restore,
+      redeemOfferCode,
       refresh
     }),
-    [isLoading, isTrialEligible, offering, purchase, refresh, restore, snapshot]
+    [
+      isLoading,
+      trialEligibilityByProductId,
+      offering,
+      purchase,
+      redeemOfferCode,
+      refresh,
+      restore,
+      snapshot
+    ]
   );
 
   return (

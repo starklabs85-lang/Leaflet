@@ -33,6 +33,7 @@ const QUICK_LOG_TYPES: CareLogType[] = [
   "fertilize",
   "repot",
   "prune",
+  "rotate",
   "mist",
   "note"
 ];

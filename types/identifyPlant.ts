@@ -97,6 +97,7 @@ export type IdentifyPlantErrorResponse = {
       | "missing_openai_key"
       | "method_not_allowed"
       | "openai_unavailable"
+      | "premium_required"
       | "rate_limited"
       | "unauthorized"
       | "validation_failed";

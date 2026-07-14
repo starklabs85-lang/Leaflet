@@ -16,6 +16,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 
 import { ScanFrame } from "@/components/illustrations/ScanFrame";
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { UpgradePrompt } from "@/components/payments/UpgradePrompt";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +24,10 @@ import { Card } from "@/components/ui/Card";
 import { IconChip } from "@/components/ui/IconChip";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { theme } from "@/constants/theme";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import {
   diagnosePlantPhoto,
   fetchDiagnosisSpeciesContext
@@ -34,6 +39,7 @@ import {
   checkIdentifyScanAllowance
 } from "@/lib/payments/limits";
 import { useEntitlement } from "@/providers/EntitlementProvider";
+import { useOnboarding } from "@/providers/OnboardingProvider";
 import type {
   IdentifyPlantResult,
   PlantIdentificationCandidate,
@@ -41,6 +47,7 @@ import type {
 } from "@/types/identifyPlant";
 
 type CapturedPhoto = {
+  source: "camera" | "library";
   uri: string;
   width?: number;
   height?: number;
@@ -71,7 +78,11 @@ export default function ScanScreen() {
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const [limitTitle, setLimitTitle] = useState<string | null>(null);
+  const [showOnboardingPremiumPrompt, setShowOnboardingPremiumPrompt] =
+    useState(false);
   const { isPremium } = useEntitlement();
+  const onboarding = useOnboarding();
 
   useEffect(() => {
     const nextMode = getInitialMode(params.mode);
@@ -114,6 +125,10 @@ export default function ScanScreen() {
 
     setMode(nextMode);
     setErrorMessage(null);
+    void trackAction(ANALYTICS_EVENTS.SCAN_MODE_CHANGE, {
+      from_mode: mode,
+      to_mode: nextMode
+    });
   }
 
   async function capturePhoto() {
@@ -121,6 +136,11 @@ export default function ScanScreen() {
 
     if (!cameraPermission?.granted) {
       const permission = await requestCameraPermission();
+
+      void trackAction(ANALYTICS_EVENTS.CAMERA_PERMISSION_RESULT, {
+        result: permission.granted ? "granted" : "denied",
+        source: "scan"
+      });
 
       if (!permission.granted) {
         setErrorMessage("Camera access is needed to take a plant photo.");
@@ -134,11 +154,21 @@ export default function ScanScreen() {
     });
 
     if (!captured?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PHOTO_CAPTURE, {
+        mode,
+        reason: "missing_photo",
+        result: "failure"
+      });
       setErrorMessage("The camera could not capture a photo. Please try again.");
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.PHOTO_CAPTURE, {
+      mode,
+      result: "success"
+    });
     setPhoto({
+      source: "camera",
       uri: captured.uri,
       width: captured.width,
       height: captured.height
@@ -150,6 +180,11 @@ export default function ScanScreen() {
     setErrorMessage(null);
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    void trackAction(ANALYTICS_EVENTS.LIBRARY_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "scan"
+    });
 
     if (!permission.granted) {
       setErrorMessage("Photo library access is needed to choose an image.");
@@ -164,17 +199,31 @@ export default function ScanScreen() {
     });
 
     if (picked.canceled) {
+      void trackAction(ANALYTICS_EVENTS.PHOTO_PICK, {
+        mode,
+        result: "cancelled"
+      });
       return;
     }
 
     const asset = picked.assets[0];
 
     if (!asset?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PHOTO_PICK, {
+        mode,
+        reason: "missing_photo",
+        result: "failure"
+      });
       setErrorMessage("That image could not be loaded. Please choose another.");
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.PHOTO_PICK, {
+      mode,
+      result: "success"
+    });
     setPhoto({
+      source: "library",
       uri: asset.uri,
       width: asset.width,
       height: asset.height
@@ -190,8 +239,15 @@ export default function ScanScreen() {
     setStep("loading");
     setErrorMessage(null);
     setLimitMessage(null);
+    setLimitTitle(null);
     setResult(null);
     setSelectedAlternateIndex(null);
+    setShowOnboardingPremiumPrompt(false);
+    void trackAction(ANALYTICS_EVENTS.SCAN_SUBMIT, {
+      has_plant_context: Boolean(sourcePlantId),
+      mode,
+      photo_source: photo.source
+    });
 
     // Friendly pre-check; the identify-plant function enforces the same caps
     // server-side, so this only exists to avoid a wasted upload.
@@ -201,7 +257,12 @@ export default function ScanScreen() {
         : await checkDiagnoseScanAllowance(isPremium);
 
     if (!allowance.allowed) {
+      void trackAction(ANALYTICS_EVENTS.FREE_LIMIT_HIT, {
+        mode,
+        stage: "precheck"
+      });
       setLimitMessage(allowance.message);
+      setLimitTitle(mode === "diagnose" ? "Premium required" : null);
       setStep("limit");
       return;
     }
@@ -218,24 +279,52 @@ export default function ScanScreen() {
         });
 
         if (!response.ok) {
-          if (response.error.code === "free_limit_reached") {
+          if (
+            response.error.code === "free_limit_reached" ||
+            response.error.code === "premium_required"
+          ) {
+            void trackAction(ANALYTICS_EVENTS.FREE_LIMIT_HIT, {
+              mode,
+              reason: response.error.code,
+              stage: "server"
+            });
             setLimitMessage(response.error.message);
+            setLimitTitle(
+              response.error.code === "premium_required" ? "Premium required" : null
+            );
             setStep("limit");
             return;
           }
 
+          void trackAction(ANALYTICS_EVENTS.IDENTIFY_RESULT, {
+            reason: response.error.code,
+            result: "failure"
+          });
           setErrorMessage(getScanErrorMessage(response.error.message, mode));
           setStep("error");
           return;
         }
 
         if (response.data.scanType !== "identify") {
+          void trackAction(ANALYTICS_EVENTS.IDENTIFY_RESULT, {
+            reason: "invalid_scan_type",
+            result: "failure"
+          });
           setErrorMessage("Identification result could not be read.");
           setStep("error");
           return;
         }
 
+        void trackAction(ANALYTICS_EVENTS.IDENTIFY_RESULT, {
+          has_species_profile:
+            response.data.result.isPlant && Boolean(response.data.result.speciesId),
+          is_plant: response.data.result.isPlant,
+          result: "success"
+        });
         setResult(response.data.result);
+        if (!isPremium && onboarding.status === "needs_onboarding") {
+          setShowOnboardingPremiumPrompt(true);
+        }
         setStep("result");
         return;
       }
@@ -243,6 +332,11 @@ export default function ScanScreen() {
       const contextResult = await fetchDiagnosisSpeciesContext(sourcePlantId);
 
       if (!contextResult.ok) {
+        void trackAction(ANALYTICS_EVENTS.DIAGNOSE_RESULT, {
+          reason: contextResult.code,
+          result: "failure",
+          stage: "context"
+        });
         setErrorMessage(contextResult.message);
         setStep("error");
         return;
@@ -255,17 +349,36 @@ export default function ScanScreen() {
       });
 
       if (!response.ok) {
-        if (response.code === "free_limit_reached") {
+        if (
+          response.code === "free_limit_reached" ||
+          response.code === "premium_required"
+        ) {
+          void trackAction(ANALYTICS_EVENTS.FREE_LIMIT_HIT, {
+            mode,
+            reason: response.code,
+            stage: "server"
+          });
           setLimitMessage(response.message);
+          setLimitTitle(
+            response.code === "premium_required" ? "Premium required" : null
+          );
           setStep("limit");
           return;
         }
 
+        void trackAction(ANALYTICS_EVENTS.DIAGNOSE_RESULT, {
+          reason: response.code,
+          result: "failure",
+          stage: "diagnose"
+        });
         setErrorMessage(getScanErrorMessage(response.message, mode));
         setStep("error");
         return;
       }
 
+      void trackAction(ANALYTICS_EVENTS.DIAGNOSE_RESULT, {
+        result: "success"
+      });
       const draft = createDiagnosisDraft({
         photoUri: compressed.uri,
         result: response.data.result,
@@ -278,21 +391,85 @@ export default function ScanScreen() {
         params: { draftId: draft.id }
       });
     } catch (error) {
+      void trackAction(
+        mode === "identify"
+          ? ANALYTICS_EVENTS.IDENTIFY_RESULT
+          : ANALYTICS_EVENTS.DIAGNOSE_RESULT,
+        {
+          reason: getScanFailureReason(error),
+          result: "failure"
+        }
+      );
       setErrorMessage(getScanErrorMessage(error, mode));
       setStep("error");
     }
   }
 
   function resetScan() {
+    if (step !== "camera" || photo || result || errorMessage || limitMessage) {
+      void trackAction(ANALYTICS_EVENTS.SCAN_AGAIN, {
+        from_step: step,
+        mode
+      });
+    }
     setPhoto(null);
     setResult(null);
     setSelectedAlternateIndex(null);
     setErrorMessage(null);
     setLimitMessage(null);
+    setLimitTitle(null);
+    setShowOnboardingPremiumPrompt(false);
     setStep("camera");
   }
 
+  async function completeFreeScanOnboarding() {
+    try {
+      await onboarding.completeAfterFreeScan();
+    } catch (error) {
+      console.warn("Fernly onboarding completion after free scan failed", error);
+    }
+  }
+
+  async function continueAfterFreeScan() {
+    setShowOnboardingPremiumPrompt(false);
+    await completeFreeScanOnboarding();
+    router.replace("/(auth)/(tabs)/home" as never);
+  }
+
+  async function upgradeAfterFreeScan() {
+    setShowOnboardingPremiumPrompt(false);
+    await completeFreeScanOnboarding();
+    void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+      source: "onboarding_scan_result"
+    });
+    router.push("/(auth)/premium" as never);
+  }
+
+  async function scanAgainAfterFreeScan() {
+    setShowOnboardingPremiumPrompt(false);
+    await completeFreeScanOnboarding();
+    resetScan();
+  }
+
   const copy = getModeCopy(mode, Boolean(sourcePlantId));
+
+  if (mode === "diagnose" && !isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Diagnosis requires Premium"
+        message="Identify remains available once per day. Premium unlocks disease and pest diagnosis before any photo is uploaded."
+        secondaryLabel="Identify instead"
+        onSecondaryPress={() => {
+          void trackAction(ANALYTICS_EVENTS.SCAN_MODE_CHANGE, {
+            from_mode: "diagnose",
+            source: "premium_locked",
+            to_mode: "identify"
+          });
+          setMode("identify");
+        }}
+      />
+    );
+  }
 
   if (step === "preview" && photo) {
     return (
@@ -300,17 +477,6 @@ export default function ScanScreen() {
         <View style={styles.previewShell}>
           <Image source={{ uri: photo.uri }} style={styles.previewImage} />
           <View style={styles.previewPanel}>
-            <View style={styles.previewNotice}>
-              <MaterialCommunityIcons
-                color={theme.colors.moss}
-                name="cloud-lock-outline"
-                size={18}
-              />
-              <Text style={styles.previewNoticeText}>
-                Continuing sends this photo to Leaflet's cloud (Supabase + OpenAI)
-                for AI processing.
-              </Text>
-            </View>
             <View style={styles.previewActions}>
               <Button
                 accessibilityLabel="Retake plant photo"
@@ -363,6 +529,8 @@ export default function ScanScreen() {
           <Image source={{ uri: photo.uri }} style={styles.resultPhoto} />
           <View style={styles.resultPanel}>
             <UpgradePrompt
+              analyticsSource="scan_limit"
+              title={limitTitle ?? undefined}
               message={
                 limitMessage ??
                 "You've reached today's free scan limit. Upgrade to Premium for unlimited scans."
@@ -399,12 +567,30 @@ export default function ScanScreen() {
             />
           ) : visibleResult?.isPlant ? (
             <PlantResult
+              isPremium={isPremium}
               sourcePhotoUri={photo.uri}
               result={visibleResult}
               selectedAlternateIndex={selectedAlternateIndex}
               onSelectAlternate={setSelectedAlternateIndex}
-              onScanAgain={resetScan}
+              onPremiumAction={
+                showOnboardingPremiumPrompt ? upgradeAfterFreeScan : undefined
+              }
+              onScanAgain={
+                showOnboardingPremiumPrompt ? scanAgainAfterFreeScan : resetScan
+              }
             />
+          ) : null}
+          {showOnboardingPremiumPrompt ? (
+            <View style={styles.resultPanel}>
+            <UpgradePrompt
+              analyticsSource="onboarding_scan_result"
+              title="Unlock the rest of Fernly"
+              message="Your first identification result is ready. Premium unlocks saving this plant, care info, diagnosis, reminders, weather tips, and growth photos."
+                dismissLabel="Continue with free"
+                onDismiss={continueAfterFreeScan}
+                onUpgrade={upgradeAfterFreeScan}
+              />
+            </View>
           ) : null}
         </ScrollView>
       </SafeAreaView>
@@ -421,8 +607,7 @@ export default function ScanScreen() {
             <IconChip icon="camera-outline" size={72} />
             <Text style={styles.permissionTitle}>Ready when your plant is</Text>
             <Text style={styles.permissionText}>
-              We only ask for the camera when you scan. Photos are processed in the
-              cloud through Supabase and OpenAI.
+              We only ask for camera access when you choose to scan a plant.
             </Text>
             <Button
               accessibilityLabel="Enable camera access"
@@ -480,9 +665,7 @@ export default function ScanScreen() {
             {errorMessage ? (
               <Text style={styles.overlayError}>{errorMessage}</Text>
             ) : null}
-            <Text style={styles.privacyHint}>
-              Clear, well-lit photos work best — they're sent for cloud AI analysis.
-            </Text>
+            <Text style={styles.privacyHint}>Clear, well-lit photos work best.</Text>
             <View style={styles.captureRow}>
               <PressableScale
                 accessibilityLabel="Choose plant photo from gallery"
@@ -571,20 +754,38 @@ function ModeButton({
 }
 
 function PlantResult({
+  isPremium,
+  onPremiumAction,
   result,
   selectedAlternateIndex,
   onSelectAlternate,
   onScanAgain,
   sourcePhotoUri
 }: {
+  isPremium: boolean;
   result: PlantIdentificationResult;
   selectedAlternateIndex: number | null;
   onSelectAlternate: (index: number | null) => void;
+  onPremiumAction?: () => void;
   onScanAgain: () => void;
   sourcePhotoUri: string;
 }) {
   const confidence = getConfidenceLabel(result.primary.confidence);
   const hasSpeciesProfile = Boolean(result.speciesId);
+
+  function openPremium(reason: "care_info" | "save_plant") {
+    void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+      reason,
+      source: "scan_result"
+    });
+
+    if (onPremiumAction) {
+      onPremiumAction();
+      return;
+    }
+
+    router.push("/(auth)/premium" as never);
+  }
 
   return (
     <View style={styles.resultPanel}>
@@ -621,9 +822,15 @@ function PlantResult({
               key={`${alternate.scientificName}-${index}`}
               alternate={alternate}
               selected={selectedAlternateIndex === index}
-              onPress={() =>
-                onSelectAlternate(selectedAlternateIndex === index ? null : index)
-              }
+              onPress={() => {
+                const isSelecting = selectedAlternateIndex !== index;
+
+                void trackAction(ANALYTICS_EVENTS.ALTERNATE_SELECTED, {
+                  alternate_rank: index + 1,
+                  selected: isSelecting
+                });
+                onSelectAlternate(isSelecting ? index : null);
+              }}
             />
           ))}
         </View>
@@ -633,32 +840,42 @@ function PlantResult({
           accessibilityLabel="Add identified plant to my plants"
           disabled={!hasSpeciesProfile}
           gradient
-          icon="plus"
-          label="Add to my plants"
+          icon={isPremium ? "plus" : "lock-outline"}
+          label={isPremium ? "Add to my plants" : "Save with Premium"}
           onPress={() =>
-            result.speciesId
-              ? router.push({
-                  pathname: "/(auth)/plants/save" as never,
-                  params: {
-                    speciesId: result.speciesId,
-                    photoUri: sourcePhotoUri
-                  }
-                })
-              : undefined
+            !isPremium
+              ? openPremium("save_plant")
+              : result.speciesId
+                ? router.push({
+                    pathname: "/(auth)/plants/save" as never,
+                    params: {
+                      speciesId: result.speciesId,
+                      photoUri: sourcePhotoUri
+                    }
+                  })
+                : undefined
           }
         />
         <Button
           accessibilityLabel="View care information for identified plant"
           disabled={!hasSpeciesProfile}
-          icon="book-open-variant"
-          label={hasSpeciesProfile ? "View care info" : "Care info unavailable"}
+          icon={isPremium ? "book-open-variant" : "lock-outline"}
+          label={
+            hasSpeciesProfile
+              ? isPremium
+                ? "View care info"
+                : "Care info with Premium"
+              : "Care info unavailable"
+          }
           onPress={() =>
-            result.speciesId
-              ? router.push({
-                  pathname: "/(auth)/species/[speciesId]" as never,
-                  params: { speciesId: result.speciesId }
-                })
-              : undefined
+            !isPremium
+              ? openPremium("care_info")
+              : result.speciesId
+                ? router.push({
+                    pathname: "/(auth)/species/[speciesId]" as never,
+                    params: { speciesId: result.speciesId }
+                  })
+                : undefined
           }
           variant="secondary"
         />
@@ -756,8 +973,8 @@ function getModeCopy(mode: ScanMode, hasPlantContext: boolean) {
         "Photograph the affected area — yellowing leaves, spots, pests, or unusual damage.",
       loadingTitle: "Checking plant health...",
       loadingText: hasPlantContext
-        ? "Securely sending this photo for cloud AI analysis with the plant profile."
-        : "Securely sending this photo for cloud AI analysis of disease, pests, nutrients, or stress.",
+        ? "Reviewing this photo with the saved plant profile."
+        : "Reviewing the photo for disease, pests, nutrients, or stress.",
       submitLabel: "Diagnose plant",
       errorFallback: "Please try again with a clearer close-up of the affected area."
     };
@@ -766,8 +983,7 @@ function getModeCopy(mode: ScanMode, hasPlantContext: boolean) {
   return {
     hint: "Center the plant and get a clear shot of the leaves.",
     loadingTitle: "Identifying your plant...",
-    loadingText:
-      "Securely sending this photo for cloud AI analysis of leaf shape, color, and growth pattern.",
+    loadingText: "Reviewing leaf shape, color, and growth pattern.",
     submitLabel: "Use this photo",
     errorFallback: "Please try again with a clearer plant photo."
   };
@@ -846,7 +1062,7 @@ function getScanErrorMessage(error: unknown, mode: ScanMode) {
     normalized.includes("fetch") ||
     normalized.includes("offline")
   ) {
-    return "Leaflet needs a connection to process scans. Reconnect and try again.";
+    return "Fernly needs a connection to process scans. Reconnect and try again.";
   }
 
   if (normalized.includes("timeout") || normalized.includes("timed out")) {
@@ -870,6 +1086,37 @@ function getScanErrorMessage(error: unknown, mode: ScanMode) {
   }
 
   return fallback;
+}
+
+function getScanFailureReason(error: unknown) {
+  const message =
+    typeof error === "string"
+      ? error.toLowerCase()
+      : error instanceof Error
+        ? error.message.toLowerCase()
+        : "";
+
+  if (
+    message.includes("network") ||
+    message.includes("fetch") ||
+    message.includes("offline")
+  ) {
+    return "network";
+  }
+
+  if (message.includes("timeout") || message.includes("timed out")) {
+    return "timeout";
+  }
+
+  if (
+    message.includes("too large") ||
+    message.includes("invalid") ||
+    message.includes("validation")
+  ) {
+    return "validation";
+  }
+
+  return "unknown";
 }
 
 function getConfidenceLabel(confidence: number): { label: string; tone: BadgeTone } {
@@ -1058,20 +1305,6 @@ const styles = StyleSheet.create({
     marginTop: -theme.spacing.xl,
     padding: theme.spacing.lg,
     ...theme.shadow.lifted
-  },
-  previewNotice: {
-    alignItems: "center",
-    backgroundColor: theme.colors.leafMuted,
-    borderRadius: theme.radius.md,
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    padding: theme.spacing.md
-  },
-  previewNoticeText: {
-    ...theme.text.caption,
-    color: theme.colors.forest,
-    flex: 1,
-    lineHeight: 18
   },
   previewActions: {
     flexDirection: "row",

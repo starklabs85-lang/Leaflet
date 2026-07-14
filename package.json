@@ -9,6 +9,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "build:dev:ios": "eas build --profile development --platform ios",
+    "build:dev:ios-device": "eas build --profile development-device --platform ios",
     "build:dev:android": "eas build --profile development --platform android",
     "typecheck": "tsc --noEmit"
   },
@@ -16,10 +17,13 @@
     "@expo-google-fonts/fredoka": "^0.4.1",
     "@expo-google-fonts/nunito": "^0.4.2",
     "@expo/vector-icons": "^15.1.1",
+    "@react-native-firebase/analytics": "^24.1.1",
+    "@react-native-firebase/app": "^24.1.1",
     "@react-native-google-signin/google-signin": "^16.0.0",
     "@supabase/supabase-js": "^2.0.0",
     "expo": "^54.0.0",
     "expo-apple-authentication": "~8.0.0",
+    "expo-build-properties": "~1.0.10",
     "expo-camera": "~17.0.0",
     "expo-constants": "~18.0.7",
     "expo-crypto": "~15.0.9",
@@ -39,11 +43,13 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-fbsdk-next": "^13.4.3",
     "react-native-purchases": "^10.2.2",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
-    "react-native-url-polyfill": "^2.0.0"
+    "react-native-url-polyfill": "^2.0.0",
+    "react-native-web": "^0.21.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

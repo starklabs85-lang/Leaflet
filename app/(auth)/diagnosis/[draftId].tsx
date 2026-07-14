@@ -12,11 +12,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { PlantImage } from "@/components/ui/PlantImage";
 import { theme } from "@/constants/theme";
 import { saveDiagnosis } from "@/lib/api/diagnosis";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import { listUserPlants } from "@/lib/api/plantCollection";
 import { getDiagnosisDraft } from "@/lib/diagnosisDraftStore";
+import { useEntitlement } from "@/providers/EntitlementProvider";
 import type { DiagnosisDraft, SavedDiagnosis } from "@/types/diagnosis";
 import { DIAGNOSIS_ADVISORY } from "@/types/diagnosis";
 import type { SavedPlant } from "@/types/plantCollection";
@@ -27,6 +33,22 @@ type LoadState =
   | { status: "missing" };
 
 export default function DiagnosisResultScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Diagnosis requires Premium"
+        message="Disease and pest diagnosis, treatment plans, follow-up reminders, and diagnosis history are included with Premium."
+        icon="stethoscope"
+      />
+    );
+  }
+
+  return <PremiumDiagnosisResultScreen />;
+}
+
+function PremiumDiagnosisResultScreen() {
   const params = useLocalSearchParams<{ draftId?: string | string[] }>();
   const draftId = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
@@ -83,9 +105,19 @@ export default function DiagnosisResultScreen() {
 
     if (!result.ok) {
       setMessage(result.message);
+      void trackAction(ANALYTICS_EVENTS.DIAGNOSIS_SAVE_RESULT, {
+        reason: result.code,
+        result: "failure",
+        target
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.DIAGNOSIS_SAVE_RESULT, {
+      attached_to_plant: Boolean(result.data.userPlantId),
+      result: "success",
+      target
+    });
     setSavedDiagnosis(result.data);
     setMessage(
       result.data.userPlantId
@@ -247,7 +279,12 @@ export default function DiagnosisResultScreen() {
                     accessibilityLabel={`Attach diagnosis to ${plant.displayName}`}
                     accessibilityRole="button"
                     key={plant.id}
-                    onPress={() => setSelectedPlantId(plant.id)}
+                    onPress={() => {
+                      setSelectedPlantId(plant.id);
+                      void trackAction(ANALYTICS_EVENTS.DIAGNOSIS_ATTACH_SELECT, {
+                        source: "diagnosis_result"
+                      });
+                    }}
                     style={[
                       styles.plantChoice,
                       selectedPlantId === plant.id ? styles.plantChoiceActive : null

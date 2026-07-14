@@ -17,6 +17,7 @@ import { EmptyPlants } from "@/components/illustrations/EmptyPlants";
 import { LineChart } from "@/components/illustrations/LineChart";
 import { ProgressRing } from "@/components/illustrations/ProgressRing";
 import { Sparkle } from "@/components/illustrations/Sparkle";
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -29,12 +30,17 @@ import { TodayNearYou } from "@/components/weather/TodayNearYou";
 import { fetchDashboardData } from "@/lib/api/dashboard";
 import { formatCareType, quickLogCare } from "@/lib/api/careSchedule";
 import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
+import {
   getPendingStreakMilestone,
   markStreakMilestoneCelebrated,
   type StreakMilestone
 } from "@/lib/careStreakMilestones";
 import { theme } from "@/constants/theme";
 import { useAuth } from "@/providers/AuthProvider";
+import { useEntitlement } from "@/providers/EntitlementProvider";
 import type { CareLogType, CareTaskType } from "@/types/careSchedule";
 import type { DashboardData, DashboardTask, ConsistencyWeek } from "@/types/dashboard";
 import type { PlantStatus, SavedPlant } from "@/types/plantCollection";
@@ -56,6 +62,22 @@ const LOGGABLE_TASK_TYPES: LoggableTaskType[] = [
 ];
 
 export default function HomeScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Dashboard requires Premium"
+        message="Your care dashboard, reminders, weather tips, and ongoing plant utility are included with Premium. You can still scan one plant per day."
+        icon="home-variant-outline"
+      />
+    );
+  }
+
+  return <PremiumHomeScreen />;
+}
+
+function PremiumHomeScreen() {
   const auth = useAuth();
   const { width } = useWindowDimensions();
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
@@ -131,9 +153,20 @@ export default function HomeScreen() {
             : result.message
         });
       }
+      void trackAction(ANALYTICS_EVENTS.TODAY_TASK_COMPLETE, {
+        reason: result.code,
+        result: "failure",
+        source: "home",
+        task_type: task.type
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.TODAY_TASK_COMPLETE, {
+      result: "success",
+      source: "home",
+      task_type: task.type
+    });
     setLoadState((current) => {
       if (current.status !== "ready") {
         return current;
@@ -544,7 +577,7 @@ function PlantsPreview({ plants }: { plants: SavedPlant[] }) {
           <EmptyPlants size={132} />
           <Text style={styles.emptyTitle}>Start your collection</Text>
           <Text style={styles.emptyText}>
-            Scan your first plant and Leaflet will handle the care plan.
+            Scan your first plant and Fernly will handle the care plan.
           </Text>
           <Button
             accessibilityLabel="Scan a plant to start your collection"

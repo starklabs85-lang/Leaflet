@@ -236,7 +236,7 @@ async function phraseTips(tips: WeatherTip[]): Promise<WeatherTip[] | null> {
           {
             role: "system",
             content:
-              "You rewrite plant-care weather tips for the Leaflet app: warm, brief, friendly, plain language. Rephrase each provided message without changing its facts, numbers, plant names, or advice. Never add new care advice. Return JSON: {\"tips\":[{\"id\":\"string\",\"message\":\"string\"}]}."
+              "You rewrite plant-care weather tips for the Fernly app: warm, brief, friendly, plain language. Rephrase each provided message without changing its facts, numbers, plant names, or advice. Never add new care advice. Return JSON: {\"tips\":[{\"id\":\"string\",\"message\":\"string\"}]}."
           },
           {
             role: "user",

@@ -9,6 +9,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
 
@@ -24,15 +25,28 @@ type ConnectivityContextValue = {
 
 const CHECK_INTERVAL_MS = 30000;
 const CHECK_TIMEOUT_MS = 4500;
+const OFFLINE_FAILURE_THRESHOLD = 2;
 
 const ConnectivityContext = createContext<ConnectivityContextValue | null>(null);
 
 export function ConnectivityProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<ConnectivityStatus>("checking");
+  const consecutiveFailures = useRef(0);
 
   const checkNow = useCallback(async () => {
     const online = await checkSupabaseReachability();
-    setStatus(online ? "online" : "offline");
+
+    if (online) {
+      consecutiveFailures.current = 0;
+      setStatus("online");
+      return;
+    }
+
+    consecutiveFailures.current += 1;
+
+    if (consecutiveFailures.current >= OFFLINE_FAILURE_THRESHOLD) {
+      setStatus("offline");
+    }
   }, []);
 
   useEffect(() => {

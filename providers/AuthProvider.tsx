@@ -10,21 +10,22 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 
 import {
-  type EmailPasswordCredentials,
-  type EmailPasswordSignUpResult,
+  deleteAccount as deleteSupabaseAccount,
   isUserCancelledAuthError,
-  signInWithEmailPassword as signInWithEmailPasswordAction,
   signInWithAppleIdToken,
-  signInWithDevTestAccount,
   signInWithGoogleIdToken,
-  signUpWithEmailPassword as signUpWithEmailPasswordAction,
   signOutOfNativeProviders
 } from "@/lib/auth";
+import {
+  ANALYTICS_EVENTS,
+  clearAnalyticsUser,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import { getSupabaseConfigIssue, hasSupabaseConfig } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
 
 type AuthStatus = "loading" | "authenticated" | "signed-out" | "missing-config";
-type AuthProviderName = "apple" | "google" | "dev" | "email-sign-in" | "email-sign-up";
+type AuthProviderName = "apple" | "google";
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -33,13 +34,9 @@ type AuthContextValue = {
   errorMessage: string | null;
   activeProvider: AuthProviderName | null;
   isLoading: boolean;
-  signInWithEmailPassword: (credentials: EmailPasswordCredentials) => Promise<void>;
-  signUpWithEmailPassword: (
-    credentials: EmailPasswordCredentials
-  ) => Promise<EmailPasswordSignUpResult | undefined>;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signInWithDevTest: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 };
@@ -104,17 +101,36 @@ export function AuthProvider({ children }: PropsWithChildren) {
     async <T,>(provider: AuthProviderName, action: () => Promise<T>) => {
       setActiveProvider(provider);
       setErrorMessage(null);
+      void trackAction(ANALYTICS_EVENTS.SIGN_IN_TAP, { provider });
 
       try {
-        return await action();
+        const result = await action();
+
+        if (isCancelledAuthOutcome(result)) {
+          void trackAction(ANALYTICS_EVENTS.SIGN_IN_CANCEL, { provider });
+          return result;
+        }
+
+        void trackAction(ANALYTICS_EVENTS.SIGN_IN_RESULT, {
+          provider,
+          result: "success"
+        });
+
+        return result;
       } catch (error) {
-        if (!isUserCancelledAuthError(error)) {
+        if (isUserCancelledAuthError(error)) {
+          void trackAction(ANALYTICS_EVENTS.SIGN_IN_CANCEL, { provider });
+        } else {
           const message = formatAuthError(error);
 
-          console.warn("Leaflet auth action failed", {
+          console.warn("Fernly auth action failed", {
             provider,
             message,
             error
+          });
+          void trackAction(ANALYTICS_EVENTS.SIGN_IN_FAILURE, {
+            provider,
+            reason: getAuthFailureReason(error)
           });
           setErrorMessage(message);
         }
@@ -124,22 +140,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     },
     []
-  );
-
-  const signInWithEmailPassword = useCallback(
-    (credentials: EmailPasswordCredentials) =>
-      runAuthAction("email-sign-in", () =>
-        signInWithEmailPasswordAction(credentials)
-      ) as Promise<void>,
-    [runAuthAction]
-  );
-
-  const signUpWithEmailPassword = useCallback(
-    (credentials: EmailPasswordCredentials) =>
-      runAuthAction("email-sign-up", () =>
-        signUpWithEmailPasswordAction(credentials)
-      ),
-    [runAuthAction]
   );
 
   const signInWithApple = useCallback(
@@ -152,11 +152,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       runAuthAction("google", async () => {
         await signInWithGoogleIdToken();
       }),
-    [runAuthAction]
-  );
-
-  const signInWithDevTest = useCallback(
-    () => runAuthAction("dev", signInWithDevTestAccount),
     [runAuthAction]
   );
 
@@ -174,10 +169,57 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await signOutOfNativeProviders();
 
     if (error) {
+      void trackAction(ANALYTICS_EVENTS.SIGN_OUT, { result: "failure" });
       setErrorMessage(error.message);
       return;
     }
 
+    await trackAction(ANALYTICS_EVENTS.SIGN_OUT, { result: "success" });
+    await clearAnalyticsUser();
+    setSession(null);
+    setStatus("signed-out");
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    setErrorMessage(null);
+    setActiveProvider(null);
+
+    if (!hasSupabaseConfig()) {
+      const message = getSupabaseConfigIssue() ?? "Supabase is not configured.";
+
+      setStatus("missing-config");
+      setErrorMessage(message);
+      throw new Error(message);
+    }
+
+    try {
+      await deleteSupabaseAccount();
+    } catch (error) {
+      const message = formatAccountDeletionError(error);
+
+      void trackAction(ANALYTICS_EVENTS.ACCOUNT_DELETE_RESULT, {
+        result: "failure",
+        reason: getAuthFailureReason(error)
+      });
+      setErrorMessage(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
+
+    const { error: signOutError } = await getSupabaseClient().auth.signOut({
+      scope: "local"
+    });
+    await signOutOfNativeProviders();
+
+    if (signOutError) {
+      console.warn("Fernly local sign-out after account deletion failed", {
+        message: signOutError.message
+      });
+    }
+
+    await trackAction(ANALYTICS_EVENTS.ACCOUNT_DELETE_RESULT, {
+      result: "success"
+    });
+    await clearAnalyticsUser();
     setSession(null);
     setStatus("signed-out");
   }, []);
@@ -194,24 +236,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
       errorMessage,
       activeProvider,
       isLoading: status === "loading" || activeProvider !== null,
-      signInWithEmailPassword,
-      signUpWithEmailPassword,
       signInWithApple,
       signInWithGoogle,
-      signInWithDevTest,
+      deleteAccount,
       signOut,
       clearError
     }),
     [
       activeProvider,
       clearError,
+      deleteAccount,
       errorMessage,
       session,
-      signInWithEmailPassword,
       signInWithApple,
       signInWithGoogle,
-      signUpWithEmailPassword,
-      signInWithDevTest,
       signOut,
       status
     ]
@@ -286,7 +324,7 @@ function formatAuthError(error: unknown) {
     normalized.includes("fetch") ||
     normalized.includes("timeout")
   ) {
-    return "Leaflet could not reach the sign-in service. Check your connection and try again.";
+    return "Fernly could not reach the sign-in service. Check your connection and try again.";
   }
 
   return code ? `${message} (code: ${code})` : message;
@@ -295,5 +333,62 @@ function formatAuthError(error: unknown) {
 function getAuthStartupErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
-    : "Leaflet could not restore your session. Please sign in again.";
+    : "Fernly could not restore your session. Please sign in again.";
+}
+
+function formatAccountDeletionError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : "Fernly could not delete your account. Please try again.";
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("network") ||
+    normalized.includes("fetch") ||
+    normalized.includes("timeout")
+  ) {
+    return "Fernly could not reach the account deletion service. Check your connection and try again.";
+  }
+
+  return message;
+}
+
+function isCancelledAuthOutcome(value: unknown) {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "cancelled" in value &&
+    (value as { cancelled?: unknown }).cancelled === true
+  );
+}
+
+function getAuthFailureReason(error: unknown) {
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String((error as { code: unknown }).code).toLowerCase()
+      : "";
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+
+  if (code === "developer_error" || code === "10") {
+    return "developer_error";
+  }
+
+  if (message.includes("not configured") || message.includes("missing")) {
+    return "missing_config";
+  }
+
+  if (
+    message.includes("network") ||
+    message.includes("fetch") ||
+    message.includes("timeout")
+  ) {
+    return "network";
+  }
+
+  if (message.includes("not available") || message.includes("unavailable")) {
+    return "unavailable";
+  }
+
+  return "unknown";
 }

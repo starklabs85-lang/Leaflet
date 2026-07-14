@@ -3,17 +3,23 @@ import type { ExpoConfig } from "expo/config";
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME;
 
 const config: ExpoConfig = {
-  name: "Leaflet",
+  name: "Fernly",
   slug: "leaflet",
   scheme: "leaflet",
   version: "0.1.0",
   orientation: "portrait",
   userInterfaceStyle: "light",
   newArchEnabled: true,
+  icon: "./FlexLeaf Plant Analyzer Creatives.png",
   ios: {
     supportsTablet: true,
+    icon: "./FlexLeaf Plant Analyzer Creatives.png",
     bundleIdentifier: "com.countrybean.leaflet",
-    usesAppleSignIn: true
+    usesAppleSignIn: true,
+    googleServicesFile: "./GoogleService-Info.plist",
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false
+    }
   },
   android: {
     package: "com.countrybean.leaflet"
@@ -31,8 +37,26 @@ const config: ExpoConfig = {
       "expo-location",
       {
         locationWhenInUsePermission:
-          "Leaflet uses your approximate location only to tailor plant care tips to your local weather.",
+          "Fernly uses your approximate location only to tailor plant care tips to your local weather.",
         isAndroidBackgroundLocationEnabled: false
+      }
+    ],
+    "./plugins/withIosFirebaseApp",
+    [
+      "@react-native-firebase/analytics",
+      {
+        ios: {
+          withoutAdIdSupport: true
+        }
+      }
+    ],
+    [
+      "expo-build-properties",
+      {
+        ios: {
+          useFrameworks: "static",
+          forceStaticLinking: ["RNFBAnalytics", "RNFBApp"]
+        }
       }
     ],
     ...(googleIosUrlScheme
@@ -40,7 +64,8 @@ const config: ExpoConfig = {
           [
             "@react-native-google-signin/google-signin",
             { iosUrlScheme: googleIosUrlScheme }
-          ] as [string, { iosUrlScheme: string }]
+          ] as [string, { iosUrlScheme: string }],
+          "./plugins/withGoogleSignInModularHeaders"
         ]
       : [])
   ],

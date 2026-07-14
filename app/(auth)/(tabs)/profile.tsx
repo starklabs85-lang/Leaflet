@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Switch,
   Text,
@@ -13,10 +14,19 @@ import type { User } from "@supabase/supabase-js";
 import { Card } from "@/components/ui/Card";
 import { GradientHeader } from "@/components/ui/GradientHeader";
 import { IconChip } from "@/components/ui/IconChip";
-import { PressableScale } from "@/components/ui/PressableScale";
+import {
+  PressableScale,
+  type PressableAnalytics
+} from "@/components/ui/PressableScale";
 import { Screen } from "@/components/ui/Screen";
 import { LEGAL_ROUTES } from "@/constants/legal";
 import { theme } from "@/constants/theme";
+import {
+  ANALYTICS_EVENTS,
+  ANALYTICS_TAPS,
+  setAnalyticsUser,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import {
   clearStoredUserLocation,
   getStoredUserLocation,
@@ -39,6 +49,7 @@ export default function ProfileScreen() {
   const entitlement = useEntitlement();
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [reminderSettings, setReminderSettings] =
     useState<CareReminderSettings | null>(null);
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
@@ -80,6 +91,15 @@ export default function ProfileScreen() {
     const result = await setCareRemindersEnabled(enabled);
 
     setReminderSettings(result.settings);
+    void trackAction(ANALYTICS_EVENTS.CARE_REMINDER_TOGGLE, {
+      enabled: result.settings.enabled,
+      result: result.ok ? "success" : "failure"
+    });
+    if (auth.user?.id) {
+      void setAnalyticsUser(auth.user.id, {
+        care_reminders_enabled: result.settings.enabled
+      });
+    }
     setReminderMessage(
       result.ok
         ? enabled
@@ -98,6 +118,10 @@ export default function ProfileScreen() {
 
     if (result.ok) {
       setWeatherAlertsOn(result.enabled);
+      void trackAction(ANALYTICS_EVENTS.FROST_ALERT_TOGGLE, {
+        enabled: result.enabled,
+        result: "success"
+      });
       setWeatherMessage(
         result.enabled
           ? "Frost alerts are on. We'll warn you the evening a freeze threatens your plants."
@@ -105,6 +129,10 @@ export default function ProfileScreen() {
       );
     } else {
       setWeatherAlertsOn(false);
+      void trackAction(ANALYTICS_EVENTS.FROST_ALERT_TOGGLE, {
+        enabled,
+        result: "failure"
+      });
       setWeatherMessage(result.message);
     }
 
@@ -115,6 +143,14 @@ export default function ProfileScreen() {
     await clearStoredUserLocation();
     setWeatherLocation(null);
     setWeatherMessage("Saved weather location removed.");
+    void trackAction(ANALYTICS_EVENTS.WEATHER_LOCATION_REMOVE, {
+      result: "success"
+    });
+    if (auth.user?.id) {
+      void setAnalyticsUser(auth.user.id, {
+        weather_location_source: "none"
+      });
+    }
   }
 
   async function restorePurchases() {
@@ -124,10 +160,15 @@ export default function ProfileScreen() {
 
     setIsRestoring(true);
     setRestoreMessage(null);
+    void trackAction(ANALYTICS_EVENTS.RESTORE_START, { source: "profile" });
 
     const outcome = await entitlement.restore();
 
     setIsRestoring(false);
+    void trackAction(ANALYTICS_EVENTS.RESTORE_RESULT, {
+      result: outcome.status,
+      source: "profile"
+    });
     setRestoreMessage(
       outcome.status === "restored"
         ? "Your Premium subscription has been restored."
@@ -135,6 +176,46 @@ export default function ProfileScreen() {
           ? "No previous purchases were found for this account."
           : outcome.message
     );
+  }
+
+  function confirmDeleteAccount() {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    void trackAction(ANALYTICS_EVENTS.ACCOUNT_DELETE_PROMPT, {
+      source: "profile"
+    });
+    Alert.alert(
+      "Delete account?",
+      "Deleting your account permanently deletes all user data and account information, including plants, care history, diagnosis records, photos, and subscription access records. This cannot be restored.\n\nApp Store subscriptions are managed separately. Cancel them in your App Store subscription settings if needed.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete account",
+          onPress: () => {
+            void runDeleteAccount();
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  }
+
+  async function runDeleteAccount() {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+
+    try {
+      await auth.deleteAccount();
+    } catch {
+      // AuthProvider keeps the session and surfaces the failure message.
+    } finally {
+      setIsDeletingAccount(false);
+    }
   }
 
   return (
@@ -146,9 +227,14 @@ export default function ProfileScreen() {
       <Card padded={false} style={styles.card}>
         <SettingsLinkRow
           icon={entitlement.isPremium ? "leaf-circle" : "leaf-circle-outline"}
-          onPress={() => router.push("/(auth)/premium" as never)}
+          onPress={() => {
+            void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+              source: "profile_membership"
+            });
+            router.push("/(auth)/premium" as never);
+          }}
           title={
-            entitlement.isPremium ? "Leaflet Premium — active" : "Upgrade to Premium"
+            entitlement.isPremium ? "Fernly Premium active" : "Upgrade to Premium"
           }
         />
         <View style={styles.divider} />
@@ -245,28 +331,83 @@ export default function ProfileScreen() {
       <Card padded={false} style={styles.card}>
         <SettingsLinkRow
           icon="shield-account-outline"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_PRIVACY_LINK,
+            params: { surface: "profile" }
+          }}
           onPress={() => router.push(LEGAL_ROUTES.privacy as never)}
           title="Privacy Policy"
         />
         <View style={styles.divider} />
         <SettingsLinkRow
+          icon="file-certificate-outline"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_EULA_LINK,
+            params: { surface: "profile" }
+          }}
+          onPress={() => router.push(LEGAL_ROUTES.eula as never)}
+          title="Standard EULA"
+        />
+        <View style={styles.divider} />
+        <SettingsLinkRow
           icon="file-document-outline"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_TERMS_LINK,
+            params: { surface: "profile" }
+          }}
           onPress={() => router.push(LEGAL_ROUTES.terms as never)}
           title="Terms of Service"
         />
       </Card>
+
+      <Text style={styles.sectionLabel}>Account</Text>
+      <PressableScale
+        accessibilityHint="Permanently deletes your Fernly account and user data"
+        accessibilityLabel="Delete account"
+        accessibilityRole="button"
+        accessibilityState={{
+          busy: isDeletingAccount,
+          disabled: auth.isLoading || isDeletingAccount
+        }}
+        disabled={auth.isLoading || isDeletingAccount}
+        onPress={confirmDeleteAccount}
+        style={[
+          styles.deleteAccountButton,
+          auth.isLoading || isDeletingAccount ? styles.disabled : null
+        ]}
+      >
+        {isDeletingAccount ? (
+          <ActivityIndicator color={theme.colors.terra} />
+        ) : (
+          <>
+            <MaterialCommunityIcons
+              color={theme.colors.terra}
+              name="delete-alert-outline"
+              size={20}
+            />
+            <Text style={styles.deleteAccountText}>Delete account</Text>
+          </>
+        )}
+      </PressableScale>
+      <Text style={styles.deleteAccountHint}>
+        Permanently deletes your Fernly account and user data. App Store
+        subscriptions must be managed separately.
+      </Text>
 
       {auth.errorMessage ? (
         <Text style={styles.errorText}>{auth.errorMessage}</Text>
       ) : null}
 
       <PressableScale
-        accessibilityLabel="Sign out of Leaflet"
+        accessibilityLabel="Sign out of Fernly"
         accessibilityRole="button"
-        accessibilityState={{ disabled: auth.isLoading }}
-        disabled={auth.isLoading}
+        accessibilityState={{ disabled: auth.isLoading || isDeletingAccount }}
+        disabled={auth.isLoading || isDeletingAccount}
         onPress={auth.signOut}
-        style={[styles.signOutButton, auth.isLoading ? styles.disabled : null]}
+        style={[
+          styles.signOutButton,
+          auth.isLoading || isDeletingAccount ? styles.disabled : null
+        ]}
       >
         {auth.isLoading ? (
           <ActivityIndicator color={theme.colors.terra} />
@@ -282,7 +423,7 @@ export default function ProfileScreen() {
         )}
       </PressableScale>
 
-      <Text style={styles.versionText}>Leaflet · Beta</Text>
+      <Text style={styles.versionText}>Fernly Beta</Text>
     </Screen>
   );
 }
@@ -312,10 +453,12 @@ function ProfileHeader({ user }: { user: User | null }) {
 }
 
 function SettingsLinkRow({
+  analytics,
   icon,
   onPress,
   title
 }: {
+  analytics?: PressableAnalytics;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   onPress: () => void;
   title: string;
@@ -324,6 +467,7 @@ function SettingsLinkRow({
     <PressableScale
       accessibilityLabel={`Open ${title}`}
       accessibilityRole="link"
+      analytics={analytics}
       haptic={false}
       onPress={onPress}
       style={styles.linkRow}
@@ -472,6 +616,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: theme.spacing.xl,
     minHeight: 54
+  },
+  deleteAccountButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.white,
+    borderColor: theme.colors.blush,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1.5,
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    justifyContent: "center",
+    minHeight: 54
+  },
+  deleteAccountText: {
+    color: theme.colors.terra,
+    fontFamily: theme.typography.fontFamily.bodyBlack,
+    fontSize: theme.typography.body
+  },
+  deleteAccountHint: {
+    ...theme.text.caption,
+    marginTop: theme.spacing.sm,
+    textAlign: "center"
   },
   signOutText: {
     color: theme.colors.terra,

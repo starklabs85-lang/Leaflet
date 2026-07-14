@@ -18,10 +18,20 @@ import {
 
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { theme } from "@/constants/theme";
+import {
+  clearAnalyticsUser,
+  setAnalyticsUser
+} from "@/lib/analytics/firebaseAnalytics";
+import { useFirebaseScreenTracking } from "@/lib/analytics/useFirebaseScreenTracking";
 import { useCareReminderNotificationRouting } from "@/lib/notifications/careReminders";
+import { getCareReminderSettings } from "@/lib/notifications/careReminders";
+import { getStoredUserLocation } from "@/lib/location/userLocation";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { ConnectivityProvider } from "@/providers/ConnectivityProvider";
-import { EntitlementProvider } from "@/providers/EntitlementProvider";
+import {
+  EntitlementProvider,
+  useEntitlement
+} from "@/providers/EntitlementProvider";
 import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
 
 // Keep the native splash visible until the brand fonts are ready so we never
@@ -59,7 +69,7 @@ export default function RootLayout() {
   // Hold briefly for brand fonts, then render with system fallback instead of
   // leaving users on a blank native splash if font loading stalls.
   if (!canRender) {
-    return <LoadingScreen message="Loading Leaflet..." />;
+    return <LoadingScreen message="Loading Fernly..." />;
   }
 
   return (
@@ -68,6 +78,7 @@ export default function RootLayout() {
         <EntitlementProvider>
           <OnboardingProvider>
             <ConnectivityProvider>
+              <AnalyticsIdentitySync />
               <AuthGate />
             </ConnectivityProvider>
           </OnboardingProvider>
@@ -77,52 +88,74 @@ export default function RootLayout() {
   );
 }
 
+function AnalyticsIdentitySync() {
+  const { status, user } = useAuth();
+  const entitlement = useEntitlement();
+  const onboarding = useOnboarding();
+  const authProvider = getAnalyticsAuthProvider(user);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function syncIdentity() {
+      if (status !== "authenticated" || !user?.id) {
+        await clearAnalyticsUser();
+        return;
+      }
+
+      const [reminderSettings, weatherLocation] = await Promise.all([
+        getCareReminderSettings().catch(() => null),
+        getStoredUserLocation().catch(() => null)
+      ]);
+
+      if (!isActive) {
+        return;
+      }
+
+      await setAnalyticsUser(user.id, {
+        auth_provider: authProvider,
+        care_reminders_enabled: reminderSettings?.enabled ?? null,
+        onboarding_status: onboarding.status,
+        premium_status: entitlement.isPremium ? "premium" : "free",
+        weather_location_source: weatherLocation?.source ?? "none"
+      });
+    }
+
+    void syncIdentity();
+
+    return () => {
+      isActive = false;
+    };
+  }, [authProvider, entitlement.isPremium, onboarding.status, status, user?.id]);
+
+  return null;
+}
+
 function AuthGate() {
   const auth = useAuth();
   const onboarding = useOnboarding();
   const router = useRouter();
   const segments = useSegments();
   const routeSegments = segments as string[];
+  const isAppLoading = auth.status === "loading" || onboarding.isLoading;
+  const pendingRedirect = isAppLoading
+    ? null
+    : getPendingAuthRedirect(routeSegments, auth.status, onboarding.status);
   useCareReminderNotificationRouting(auth.status === "authenticated");
+  useFirebaseScreenTracking({
+    enabled: !isAppLoading && pendingRedirect === null,
+    segments: routeSegments
+  });
 
   useEffect(() => {
-    if (auth.status === "loading" || onboarding.isLoading) {
+    if (!pendingRedirect) {
       return;
     }
 
-    const isPublicRoute = routeSegments[0] === "(public)";
-    const isPublicLegalRoute = isPublicRoute && routeSegments[1] === "legal";
-    const isAuthenticated = auth.status === "authenticated";
-    const isAuthOnboardingRoute =
-      routeSegments[0] === "(auth)" && routeSegments[1] === "onboarding";
-    const isFirstPlantLoopRoute =
-      routeSegments[0] === "(auth)" &&
-      ((routeSegments[1] === "(tabs)" && routeSegments[2] === "scan") ||
-        (routeSegments[1] === "plants" && routeSegments[2] === "save") ||
-        routeSegments[1] === "species");
+    router.replace(pendingRedirect as never);
+  }, [pendingRedirect, router]);
 
-    if (!isAuthenticated && !isPublicRoute) {
-      router.replace(
-        (onboarding.status === "needs_onboarding"
-          ? "/(public)/onboarding/welcome"
-          : "/(public)/sign-in") as never
-      );
-      return;
-    }
-
-    if (isAuthenticated && onboarding.status === "needs_onboarding") {
-      if (isPublicRoute || (!isAuthOnboardingRoute && !isFirstPlantLoopRoute)) {
-        router.replace("/(auth)/onboarding/first-scan" as never);
-      }
-      return;
-    }
-
-    if (isAuthenticated && isPublicRoute && !isPublicLegalRoute) {
-      router.replace("/(auth)/(tabs)/home");
-    }
-  }, [auth.status, onboarding.isLoading, onboarding.status, router, segments]);
-
-  if (auth.status === "loading" || onboarding.isLoading) {
+  if (isAppLoading) {
     return <LoadingScreen message="Restoring your session..." />;
   }
 
@@ -144,10 +177,62 @@ function AuthGate() {
   );
 }
 
+function getAnalyticsAuthProvider(user: ReturnType<typeof useAuth>["user"]) {
+  const provider =
+    typeof user?.app_metadata?.provider === "string"
+      ? user.app_metadata.provider
+      : undefined;
+
+  if (provider === "apple" || provider === "google") {
+    return provider;
+  }
+
+  return "unknown";
+}
+
+function getPendingAuthRedirect(
+  routeSegments: string[],
+  authStatus: ReturnType<typeof useAuth>["status"],
+  onboardingStatus: ReturnType<typeof useOnboarding>["status"]
+) {
+  const isPublicRoute = routeSegments[0] === "(public)";
+  const isPublicLegalRoute = isPublicRoute && routeSegments[1] === "legal";
+  const isAuthenticated = authStatus === "authenticated";
+  const isAuthOnboardingRoute =
+    routeSegments[0] === "(auth)" && routeSegments[1] === "onboarding";
+  const isOnboardingScanRoute =
+    routeSegments[0] === "(auth)" &&
+    routeSegments[1] === "(tabs)" &&
+    routeSegments[2] === "scan";
+  const isOnboardingPremiumRoute =
+    routeSegments[0] === "(auth)" && routeSegments[1] === "premium";
+
+  if (!isAuthenticated && !isPublicRoute) {
+    return onboardingStatus === "needs_onboarding"
+      ? "/(public)/onboarding/welcome"
+      : "/(public)/sign-in";
+  }
+
+  if (
+    isAuthenticated &&
+    onboardingStatus === "needs_onboarding" &&
+    (isPublicRoute ||
+      (!isAuthOnboardingRoute && !isOnboardingScanRoute && !isOnboardingPremiumRoute))
+  ) {
+    return "/(auth)/onboarding/first-scan";
+  }
+
+  if (isAuthenticated && isPublicRoute && !isPublicLegalRoute) {
+    return "/(auth)/(tabs)/home";
+  }
+
+  return null;
+}
+
 function LoadingScreen({ message }: { message: string }) {
   return (
     <View style={styles.loadingScreen}>
-      <Text style={styles.loadingEyebrow}>Leaflet</Text>
+      <Text style={styles.loadingEyebrow}>Fernly</Text>
       <Text style={styles.loadingText}>{message}</Text>
       <StatusBar style="dark" />
     </View>

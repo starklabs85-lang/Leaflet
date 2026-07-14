@@ -14,6 +14,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { UpgradePrompt } from "@/components/payments/UpgradePrompt";
 import { Button } from "@/components/ui/Button";
 import { IconChip } from "@/components/ui/IconChip";
@@ -42,6 +43,10 @@ import {
 } from "@/lib/notifications/careReminders";
 import { PlantEnvironmentFields } from "@/components/plants/PlantEnvironmentFields";
 import { useOnboarding } from "@/providers/OnboardingProvider";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import type {
   CollectionSpeciesSummary,
   LightExposure,
@@ -68,6 +73,22 @@ const MAX_NAME_LENGTH = 40;
 const MAX_LOCATION_LENGTH = 40;
 
 export default function SavePlantScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Saving plants requires Premium"
+        message="Premium unlocks saved plants, collection setup, care schedules, reminders, and growth history."
+        icon="content-save-outline"
+      />
+    );
+  }
+
+  return <PremiumSavePlantScreen />;
+}
+
+function PremiumSavePlantScreen() {
   const onboarding = useOnboarding();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -118,6 +139,11 @@ export default function SavePlantScreen() {
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
+    void trackAction(ANALYTICS_EVENTS.LIBRARY_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "plant_save"
+    });
+
     if (!permission.granted) {
       setMessage("Photo library access is needed to choose a plant photo.");
       return;
@@ -131,23 +157,44 @@ export default function SavePlantScreen() {
     });
 
     if (picked.canceled) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        result: "cancelled",
+        source: "library",
+        surface: "plant_save"
+      });
       return;
     }
 
     const asset = picked.assets[0];
 
     if (!asset?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        reason: "missing_photo",
+        result: "failure",
+        source: "library",
+        surface: "plant_save"
+      });
       setMessage("That image could not be loaded.");
       return;
     }
 
     setPhotoUri(await preparePhoto(asset.uri, asset.width, asset.height));
+    void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+      result: "success",
+      source: "library",
+      surface: "plant_save"
+    });
   }
 
   async function takePhoto() {
     setMessage(null);
 
     const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    void trackAction(ANALYTICS_EVENTS.CAMERA_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "plant_save"
+    });
 
     if (!permission.granted) {
       setMessage("Camera access is needed to take a plant photo.");
@@ -161,17 +208,33 @@ export default function SavePlantScreen() {
     });
 
     if (captured.canceled) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        result: "cancelled",
+        source: "camera",
+        surface: "plant_save"
+      });
       return;
     }
 
     const asset = captured.assets[0];
 
     if (!asset?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        reason: "missing_photo",
+        result: "failure",
+        source: "camera",
+        surface: "plant_save"
+      });
       setMessage("The camera could not capture a photo.");
       return;
     }
 
     setPhotoUri(await preparePhoto(asset.uri, asset.width, asset.height));
+    void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+      result: "success",
+      source: "camera",
+      surface: "plant_save"
+    });
   }
 
   async function savePlant() {
@@ -183,12 +246,16 @@ export default function SavePlantScreen() {
     setMessage(null);
     setLimitMessage(null);
 
-    // Free accounts track up to 10 plants; existing plants stay fully usable.
+    // Save is Premium-only; this remains as a second guard at the write point.
     const allowance = await checkCollectionAllowance(isPremium);
 
     if (!allowance.allowed) {
       setIsSaving(false);
       setLimitMessage(allowance.message);
+      void trackAction(ANALYTICS_EVENTS.PLANT_SAVE_RESULT, {
+        reason: "limit",
+        result: "failure"
+      });
       return;
     }
 
@@ -200,6 +267,10 @@ export default function SavePlantScreen() {
     } catch {
       setIsSaving(false);
       setMessage("Plant photo could not be prepared. Please choose another photo.");
+      void trackAction(ANALYTICS_EVENTS.PLANT_SAVE_RESULT, {
+        reason: "photo_prepare",
+        result: "failure"
+      });
       return;
     }
 
@@ -218,8 +289,16 @@ export default function SavePlantScreen() {
 
     if (!result.ok) {
       setMessage(result.message);
+      void trackAction(ANALYTICS_EVENTS.PLANT_SAVE_RESULT, {
+        reason: result.code,
+        result: "failure"
+      });
       return;
     }
+
+    void trackAction(ANALYTICS_EVENTS.PLANT_SAVE_RESULT, {
+      result: "success"
+    });
 
     // One-time trial intro after the very first plant (Phase 12/13): shown as
     // a celebration, dismissible, and never auto-shown again.
@@ -307,6 +386,11 @@ export default function SavePlantScreen() {
           text: "Enable reminders",
           onPress: async () => {
             const reminderResult = await requestAndEnableCareReminders();
+            void trackAction(ANALYTICS_EVENTS.CARE_REMINDER_TOGGLE, {
+              enabled: reminderResult.ok,
+              result: reminderResult.ok ? "success" : "failure",
+              source: "plant_saved_prompt"
+            });
 
             if (!reminderResult.ok) {
               Alert.alert("Reminders unavailable", reminderResult.message, [

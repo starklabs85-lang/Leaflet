@@ -9,6 +9,7 @@ export default function AuthenticatedLayout() {
       <Stack.Screen name="species/[speciesId]" />
       <Stack.Screen name="plants/save" />
       <Stack.Screen name="plants/[plantId]" />
+      <Stack.Screen name="today-tasks/[plantId]" />
       <Stack.Screen name="diagnosis/[draftId]" />
     </Stack>
   );

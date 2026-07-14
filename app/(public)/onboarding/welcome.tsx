@@ -78,7 +78,7 @@ export default function OnboardingWelcomeScreen() {
         <Animated.View style={[styles.copy, entrance]}>
           <View style={styles.brandRow}>
             <BrandMark size={24} />
-            <Text style={styles.wordmark}>Leaflet</Text>
+            <Text style={styles.wordmark}>Fernly</Text>
           </View>
           <Text style={styles.title}>Happy plants,{"\n"}happy you.</Text>
           <Text style={styles.body}>
@@ -92,7 +92,7 @@ export default function OnboardingWelcomeScreen() {
           </View>
 
           <Button
-            accessibilityLabel="Get started with Leaflet onboarding"
+            accessibilityLabel="Get started with Fernly onboarding"
             gradient
             icon="arrow-right"
             iconPosition="trailing"

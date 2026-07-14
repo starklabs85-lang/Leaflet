@@ -116,11 +116,8 @@ const MAX_SCANS_PER_HOUR = 10;
 // Premium is "unlimited" product-wise; this is purely an anti-abuse backstop
 // (each scan costs an OpenAI call).
 const MAX_PREMIUM_SCANS_PER_HOUR = 30;
-// Phase 12 free-tier daily caps, counted per scan type over the current UTC day.
-const FREE_DAILY_LIMITS: Record<ScanType, number> = {
-  identify: 5,
-  diagnose: 3
-};
+// Free identify scans are counted over the current UTC day.
+const FREE_IDENTIFY_SCANS_PER_DAY = 1;
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o";
 
 const corsHeaders = {
@@ -755,7 +752,21 @@ Deno.serve(async (req) => {
   }
 
   if (!isPremium) {
-    const dailyLimit = FREE_DAILY_LIMITS[validation.value.scanType];
+    if (validation.value.scanType === "diagnose") {
+      return jsonResponse(
+        {
+          ok: false,
+          error: {
+            code: "premium_required",
+            message: "Disease diagnosis is included with Premium.",
+            scanType: validation.value.scanType
+          }
+        },
+        402
+      );
+    }
+
+    const dailyLimit = FREE_IDENTIFY_SCANS_PER_DAY;
     const utcDayStart = new Date();
     utcDayStart.setUTCHours(0, 0, 0, 0);
 
@@ -767,17 +778,12 @@ Deno.serve(async (req) => {
       .gte("created_at", utcDayStart.toISOString());
 
     if ((dailyCount ?? 0) >= dailyLimit) {
-      const noun =
-        validation.value.scanType === "identify"
-          ? "identify scans"
-          : "diagnosis scans";
-
       return jsonResponse(
         {
           ok: false,
           error: {
             code: "free_limit_reached",
-            message: `You've used your ${dailyLimit} free ${noun} today. Upgrade to Premium for unlimited scans.`,
+            message: `You've used your ${dailyLimit} free plant scan today. Upgrade to Premium for unlimited scans.`,
             scanType: validation.value.scanType,
             limit: dailyLimit
           }

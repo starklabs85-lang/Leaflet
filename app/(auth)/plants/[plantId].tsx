@@ -19,11 +19,16 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { UpgradePrompt } from "@/components/payments/UpgradePrompt";
 import { PlantEnvironmentFields } from "@/components/plants/PlantEnvironmentFields";
 import { PlantImage } from "@/components/ui/PlantImage";
 import { PlantWeatherNote } from "@/components/weather/PlantWeatherNote";
 import { theme } from "@/constants/theme";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import {
   applyOptimisticQuickLog,
   ensureCareTasksForPlant,
@@ -89,6 +94,22 @@ const QUICK_LOG_ACTIONS: CareLogType[] = [
 ];
 
 export default function PlantDetailScreen() {
+  const { isPremium } = useEntitlement();
+
+  if (!isPremium) {
+    return (
+      <PremiumLockedScreen
+        title="Plant details require Premium"
+        message="Plant profiles, care tasks, diagnosis history, weather notes, and growth photos are included with Premium."
+        icon="leaf-circle-outline"
+      />
+    );
+  }
+
+  return <PremiumPlantDetailScreen />;
+}
+
+function PremiumPlantDetailScreen() {
   const params = useLocalSearchParams<{ plantId?: string | string[] }>();
   const plantId = Array.isArray(params.plantId) ? params.plantId[0] : params.plantId;
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
@@ -183,6 +204,11 @@ export default function PlantDetailScreen() {
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
+    void trackAction(ANALYTICS_EVENTS.LIBRARY_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "plant_detail"
+    });
+
     if (!permission.granted) {
       setMessage("Photo library access is needed to replace the plant photo.");
       return;
@@ -196,12 +222,23 @@ export default function PlantDetailScreen() {
     });
 
     if (picked.canceled) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        result: "cancelled",
+        source: "library",
+        surface: "plant_detail"
+      });
       return;
     }
 
     const asset = picked.assets[0];
 
     if (!asset?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        reason: "missing_photo",
+        result: "failure",
+        source: "library",
+        surface: "plant_detail"
+      });
       setMessage("That image could not be loaded.");
       return;
     }
@@ -212,12 +249,22 @@ export default function PlantDetailScreen() {
         maxEdge: 1400
       })
     );
+    void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+      result: "success",
+      source: "library",
+      surface: "plant_detail"
+    });
   }
 
   async function takeReplacementPhoto() {
     setMessage(null);
 
     const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    void trackAction(ANALYTICS_EVENTS.CAMERA_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "plant_detail"
+    });
 
     if (!permission.granted) {
       setMessage("Camera access is needed to replace the plant photo.");
@@ -231,12 +278,23 @@ export default function PlantDetailScreen() {
     });
 
     if (captured.canceled) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        result: "cancelled",
+        source: "camera",
+        surface: "plant_detail"
+      });
       return;
     }
 
     const asset = captured.assets[0];
 
     if (!asset?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        reason: "missing_photo",
+        result: "failure",
+        source: "camera",
+        surface: "plant_detail"
+      });
       setMessage("The camera could not capture a photo.");
       return;
     }
@@ -247,6 +305,11 @@ export default function PlantDetailScreen() {
         maxEdge: 1400
       })
     );
+    void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+      result: "success",
+      source: "camera",
+      surface: "plant_detail"
+    });
   }
 
   async function saveChanges() {
@@ -271,9 +334,17 @@ export default function PlantDetailScreen() {
 
     if (!result.ok) {
       setMessage(result.message);
+      void trackAction(ANALYTICS_EVENTS.PLANT_UPDATE_RESULT, {
+        reason: result.code,
+        result: "failure"
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.PLANT_UPDATE_RESULT, {
+      changed_photo: Boolean(replacementPhotoUri),
+      result: "success"
+    });
     setLoadState({
       ...loadState,
       plant: result.data
@@ -310,9 +381,18 @@ export default function PlantDetailScreen() {
       setCareMessage(
         result.rolledBack ? "No changes were saved. Please try again." : result.message
       );
+      void trackAction(ANALYTICS_EVENTS.CARE_LOG_RESULT, {
+        reason: result.code,
+        result: "failure",
+        type
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.CARE_LOG_RESULT, {
+      result: "success",
+      type
+    });
     setLoadState((current) => {
       if (current.status !== "ready" || current.plant.id !== snapshot.plant.id) {
         return current;
@@ -355,6 +435,11 @@ export default function PlantDetailScreen() {
 
     if (!allowance.allowed) {
       setGrowthLimitMessage(allowance.message);
+      void trackAction(ANALYTICS_EVENTS.GROWTH_PHOTO_ADD, {
+        reason: "limit",
+        result: "failure",
+        source
+      });
       return;
     }
 
@@ -368,6 +453,10 @@ export default function PlantDetailScreen() {
 
       if (!asset) {
         setPendingGrowthSource(null);
+        void trackAction(ANALYTICS_EVENTS.GROWTH_PHOTO_ADD, {
+          result: "cancelled",
+          source
+        });
         return;
       }
 
@@ -385,9 +474,18 @@ export default function PlantDetailScreen() {
       if (!result.ok) {
         setCareMessage(result.message);
         setPendingGrowthSource(null);
+        void trackAction(ANALYTICS_EVENTS.GROWTH_PHOTO_ADD, {
+          reason: result.code,
+          result: "failure",
+          source
+        });
         return;
       }
 
+      void trackAction(ANALYTICS_EVENTS.GROWTH_PHOTO_ADD, {
+        result: "success",
+        source
+      });
       setLoadState((current) => {
         if (current.status !== "ready" || current.plant.id !== loadState.plant.id) {
           return current;
@@ -403,6 +501,11 @@ export default function PlantDetailScreen() {
       setCareMessage("Growth photo added.");
     } catch {
       setCareMessage("Growth photo could not be prepared. Please try another photo.");
+      void trackAction(ANALYTICS_EVENTS.GROWTH_PHOTO_ADD, {
+        reason: "photo_prepare",
+        result: "failure",
+        source
+      });
     } finally {
       setPendingGrowthSource(null);
     }
@@ -410,6 +513,11 @@ export default function PlantDetailScreen() {
 
   async function pickGrowthPhotoAsset() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    void trackAction(ANALYTICS_EVENTS.LIBRARY_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "growth_photo"
+    });
 
     if (!permission.granted) {
       setCareMessage("Photo library access is needed to add a growth photo.");
@@ -439,6 +547,11 @@ export default function PlantDetailScreen() {
 
   async function captureGrowthPhotoAsset() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    void trackAction(ANALYTICS_EVENTS.CAMERA_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "growth_photo"
+    });
 
     if (!permission.granted) {
       setCareMessage("Camera access is needed to add a growth photo.");
@@ -476,6 +589,11 @@ export default function PlantDetailScreen() {
     if (!/^\d+$/.test(rawInterval) || intervalDays < 1 || intervalDays > 365) {
       setEditingTaskId(task.id);
       setCareMessage("Enter a whole number of days between 1 and 365.");
+      void trackAction(ANALYTICS_EVENTS.TASK_INTERVAL_UPDATE, {
+        reason: "invalid_input",
+        result: "failure",
+        task_type: task.type
+      });
       return;
     }
 
@@ -493,9 +611,19 @@ export default function PlantDetailScreen() {
 
     if (!result.ok) {
       setCareMessage(result.message);
+      void trackAction(ANALYTICS_EVENTS.TASK_INTERVAL_UPDATE, {
+        reason: result.code,
+        result: "failure",
+        task_type: task.type
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.TASK_INTERVAL_UPDATE, {
+      interval_days: intervalDays,
+      result: "success",
+      task_type: task.type
+    });
     replaceTask(result.data);
     setEditingTaskId(null);
   }
@@ -519,9 +647,20 @@ export default function PlantDetailScreen() {
 
     if (!result.ok) {
       setCareMessage(result.message);
+      void trackAction(ANALYTICS_EVENTS.TASK_TOGGLE, {
+        enabled: !task.isActive,
+        reason: result.code,
+        result: "failure",
+        task_type: task.type
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.TASK_TOGGLE, {
+      enabled: result.data.isActive,
+      result: "success",
+      task_type: task.type
+    });
     replaceTask(result.data);
   }
 
@@ -560,6 +699,9 @@ export default function PlantDetailScreen() {
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.PLANT_DELETE_PROMPT, {
+      source: "plant_detail"
+    });
     Alert.alert(
       "Remove plant?",
       `Remove ${loadState.plant.displayName} from your collection? This will also remove its care schedule and history.`,
@@ -573,14 +715,30 @@ export default function PlantDetailScreen() {
 
             if (!result.ok) {
               setMessage(result.message);
+              void trackAction(ANALYTICS_EVENTS.PLANT_DELETE_RESULT, {
+                reason: result.code,
+                result: "failure"
+              });
               return;
             }
 
+            void trackAction(ANALYTICS_EVENTS.PLANT_DELETE_RESULT, {
+              result: "success"
+            });
             router.replace("/(auth)/(tabs)/plants");
           }
         }
       ]
     );
+  }
+
+  function toggleDiagnosis(diagnosisId: string) {
+    const isExpanding = expandedDiagnosisId !== diagnosisId;
+
+    void trackAction(ANALYTICS_EVENTS.DIAGNOSIS_EXPAND, {
+      expanded: isExpanding
+    });
+    setExpandedDiagnosisId(isExpanding ? diagnosisId : null);
   }
 
   if (loadState.status === "loading") {
@@ -742,6 +900,7 @@ export default function PlantDetailScreen() {
           />
           {growthLimitMessage ? (
             <UpgradePrompt
+              analyticsSource="growth_timeline_limit"
               message={growthLimitMessage}
               onDismiss={() => setGrowthLimitMessage(null)}
               style={styles.growthLimitPrompt}
@@ -765,11 +924,7 @@ export default function PlantDetailScreen() {
             error={loadState.diagnosisError}
             expandedDiagnosisId={expandedDiagnosisId}
             onRetry={loadPlant}
-            onToggle={(diagnosisId) =>
-              setExpandedDiagnosisId((current) =>
-                current === diagnosisId ? null : diagnosisId
-              )
-            }
+            onToggle={toggleDiagnosis}
           />
 
           {isEditing ? (
