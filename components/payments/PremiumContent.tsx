@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Linking, Platform, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -6,7 +6,13 @@ import type { PurchasesPackage } from "react-native-purchases";
 
 import { Button } from "@/components/ui/Button";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { LEGAL_ROUTES } from "@/constants/legal";
 import { theme } from "@/constants/theme";
+import {
+  ANALYTICS_EVENTS,
+  ANALYTICS_TAPS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import { FREE_LIMITS } from "@/lib/payments/limits";
 import { useEntitlement } from "@/providers/EntitlementProvider";
 
@@ -74,9 +80,13 @@ const COMPARISON_ROWS: ComparisonRow[] = [
 type PremiumContentProps = {
   /** Called after a successful purchase (e.g. continue the onboarding flow). */
   onPurchased?: () => void;
+  source?: string;
 };
 
-export function PremiumContent({ onPurchased }: PremiumContentProps) {
+export function PremiumContent({
+  onPurchased,
+  source = "premium_screen"
+}: PremiumContentProps) {
   const {
     isPremium,
     expiresAt,
@@ -105,6 +115,13 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
     : false;
   const annualSavingPercent = getAnnualSavingPercent(monthlyPackage, annualPackage);
 
+  useEffect(() => {
+    void trackAction(ANALYTICS_EVENTS.PAYWALL_VIEW, {
+      premium_status: isPremium ? "premium" : "free",
+      source
+    });
+  }, [isPremium, source]);
+
   async function handlePurchase() {
     if (!selectedPackage || isPurchasing) {
       return;
@@ -112,10 +129,20 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
 
     setIsPurchasing(true);
     setFeedback(null);
+    void trackAction(ANALYTICS_EVENTS.PURCHASE_START, {
+      plan: selectedPlan,
+      source,
+      trial_eligible: selectedPackageTrialEligible
+    });
 
     const outcome = await purchase(selectedPackage);
 
     setIsPurchasing(false);
+    void trackAction(ANALYTICS_EVENTS.PURCHASE_RESULT, {
+      plan: selectedPlan,
+      result: outcome.status,
+      source
+    });
 
     if (outcome.status === "purchased") {
       setFeedback("Welcome to Premium! Everything is unlocked.");
@@ -135,10 +162,15 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
 
     setIsRestoring(true);
     setFeedback(null);
+    void trackAction(ANALYTICS_EVENTS.RESTORE_START, { source });
 
     const outcome = await restore();
 
     setIsRestoring(false);
+    void trackAction(ANALYTICS_EVENTS.RESTORE_RESULT, {
+      result: outcome.status,
+      source
+    });
 
     if (outcome.status === "restored") {
       setFeedback("Your Premium subscription has been restored.");
@@ -160,10 +192,18 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
 
     setIsRedeemingCode(true);
     setFeedback(null);
+    void trackAction(ANALYTICS_EVENTS.OFFER_CODE_REDEMPTION, {
+      result: "start",
+      source
+    });
 
     const outcome = await redeemOfferCode();
 
     setIsRedeemingCode(false);
+    void trackAction(ANALYTICS_EVENTS.OFFER_CODE_REDEMPTION, {
+      result: outcome.status,
+      source
+    });
 
     if (outcome.status === "presented") {
       setFeedback(
@@ -223,7 +263,13 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
               label="Annual"
               priceText={`${annualPackage.product.priceString} / year`}
               selected={selectedPlan === "annual"}
-              onPress={() => setSelectedPlan("annual")}
+              onPress={() => {
+                setSelectedPlan("annual");
+                void trackAction(ANALYTICS_EVENTS.PLAN_SELECT, {
+                  plan: "annual",
+                  source
+                });
+              }}
             />
           ) : null}
           {monthlyPackage ? (
@@ -231,7 +277,13 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
               label="Monthly"
               priceText={`${monthlyPackage.product.priceString} / month`}
               selected={selectedPlan === "monthly"}
-              onPress={() => setSelectedPlan("monthly")}
+              onPress={() => {
+                setSelectedPlan("monthly");
+                void trackAction(ANALYTICS_EVENTS.PLAN_SELECT, {
+                  plan: "monthly",
+                  source
+                });
+              }}
             />
           ) : null}
 
@@ -267,49 +319,79 @@ export function PremiumContent({ onPurchased }: PremiumContentProps) {
 
       {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
 
-      <Button
-        accessibilityLabel="Restore previous purchases"
-        disabled={isRestoring}
-        label={isRestoring ? "Checking purchases..." : "Restore purchases"}
-        loading={isRestoring}
-        onPress={handleRestore}
-        variant="ghost"
-      />
-      {Platform.OS === "ios" ? (
+      <View style={styles.restoreActions}>
         <Button
-          accessibilityLabel="Redeem App Store offer code"
-          disabled={isRedeemingCode}
-          label={isRedeemingCode ? "Opening App Store..." : "Redeem offer code"}
-          loading={isRedeemingCode}
-          onPress={handleRedeemOfferCode}
+          accessibilityLabel="Restore previous purchases"
+          disabled={isRestoring}
+          label={isRestoring ? "Checking purchases..." : "Restore purchases"}
+          loading={isRestoring}
+          onPress={handleRestore}
           variant="ghost"
         />
-      ) : null}
+        {Platform.OS === "ios" ? (
+          <Button
+            accessibilityLabel="Redeem App Store offer code"
+            disabled={isRedeemingCode}
+            label={isRedeemingCode ? "Opening App Store..." : "Redeem offer code"}
+            loading={isRedeemingCode}
+            onPress={handleRedeemOfferCode}
+            variant="ghost"
+          />
+        ) : null}
+      </View>
 
       <View style={styles.termsRow}>
         <PressableScale
-          accessibilityLabel="Open terms of service"
-          accessibilityRole="link"
-          haptic={false}
-          onPress={() => router.push("/(public)/legal/terms" as never)}
-        >
-          <Text style={styles.termsLink}>Terms</Text>
-        </PressableScale>
-        <Text style={styles.termsDivider}>|</Text>
-        <PressableScale
           accessibilityLabel="Open privacy policy"
           accessibilityRole="link"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_PRIVACY_LINK,
+            params: { surface: "premium" }
+          }}
           haptic={false}
-          onPress={() => router.push("/(public)/legal/privacy" as never)}
+          onPress={() => router.push(LEGAL_ROUTES.privacy as never)}
         >
           <Text style={styles.termsLink}>Privacy</Text>
         </PressableScale>
         <Text style={styles.termsDivider}>|</Text>
         <PressableScale
+          accessibilityLabel="Open Standard EULA"
+          accessibilityRole="link"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_EULA_LINK,
+            params: { surface: "premium" }
+          }}
+          haptic={false}
+          onPress={() => router.push(LEGAL_ROUTES.eula as never)}
+        >
+          <Text style={styles.termsLink}>Standard EULA</Text>
+        </PressableScale>
+        <Text style={styles.termsDivider}>|</Text>
+        <PressableScale
+          accessibilityLabel="Open terms of service"
+          accessibilityRole="link"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_TERMS_LINK,
+            params: { surface: "premium" }
+          }}
+          haptic={false}
+          onPress={() => router.push(LEGAL_ROUTES.terms as never)}
+        >
+          <Text style={styles.termsLink}>Terms</Text>
+        </PressableScale>
+        <Text style={styles.termsDivider}>|</Text>
+        <PressableScale
           accessibilityLabel="Open subscription management"
           accessibilityRole="link"
+          analytics={{
+            tapName: ANALYTICS_TAPS.PREMIUM_MANAGE_SUBSCRIPTION,
+            params: { surface: "premium" }
+          }}
           haptic={false}
           onPress={() => {
+            void trackAction(ANALYTICS_EVENTS.MANAGE_SUBSCRIPTION_LINK, {
+              source
+            });
             Linking.openURL("https://support.apple.com/118428").catch(
               () => undefined
             );
@@ -386,7 +468,7 @@ function ComparisonValue({
       style={styles.tableValueIcon}
     >
       <MaterialCommunityIcons
-        color={cell.included ? theme.colors.leaf : theme.colors.moss}
+        color={cell.included ? theme.colors.leaf : theme.colors.terra}
         name={cell.included ? "check-circle" : "close-circle-outline"}
         size={22}
       />
@@ -577,9 +659,13 @@ const styles = StyleSheet.create({
     ...theme.text.bodyStrong,
     textAlign: "center"
   },
+  restoreActions: {
+    gap: 0
+  },
   termsRow: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.spacing.sm,
     justifyContent: "center"
   },

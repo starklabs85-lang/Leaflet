@@ -20,6 +20,10 @@ import { Screen } from "@/components/ui/Screen";
 import { theme } from "@/constants/theme";
 import { formatCareType, quickLogCare } from "@/lib/api/careSchedule";
 import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
+import {
   fetchTodayTaskGroupForPlant,
   summarizeTodayTaskGroup,
   type TodayTaskGroup,
@@ -126,9 +130,20 @@ function PremiumTodayTaskChecklistScreen() {
       setMessage(
         result.rolledBack ? "No changes were saved. Please try again." : result.message
       );
+      void trackAction(ANALYTICS_EVENTS.TODAY_TASK_COMPLETE, {
+        reason: result.code,
+        result: "failure",
+        source: "today_checklist",
+        task_type: task.type
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.TODAY_TASK_COMPLETE, {
+      result: "success",
+      source: "today_checklist",
+      task_type: task.type
+    });
     setOptimisticCompleted((current) => omitTask(current, task.id));
     setLoadState((current) => {
       if (current.status !== "ready" || !current.group) {

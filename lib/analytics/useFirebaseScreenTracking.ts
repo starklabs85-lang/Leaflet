@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 
-import { trackFirebaseScreenView } from "@/lib/analytics/firebaseAnalytics";
+import { trackScreenView } from "@/lib/analytics/firebaseAnalytics";
 
 type UseFirebaseScreenTrackingOptions = {
   enabled: boolean;
@@ -21,7 +21,7 @@ export function useFirebaseScreenTracking({
     }
 
     lastTrackedScreen.current = screenName;
-    void trackFirebaseScreenView(screenName);
+    void trackScreenView(screenName);
   }, [enabled, screenName]);
 }
 

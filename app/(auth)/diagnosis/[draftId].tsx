@@ -16,6 +16,10 @@ import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { PlantImage } from "@/components/ui/PlantImage";
 import { theme } from "@/constants/theme";
 import { saveDiagnosis } from "@/lib/api/diagnosis";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import { listUserPlants } from "@/lib/api/plantCollection";
 import { getDiagnosisDraft } from "@/lib/diagnosisDraftStore";
 import { useEntitlement } from "@/providers/EntitlementProvider";
@@ -101,9 +105,19 @@ function PremiumDiagnosisResultScreen() {
 
     if (!result.ok) {
       setMessage(result.message);
+      void trackAction(ANALYTICS_EVENTS.DIAGNOSIS_SAVE_RESULT, {
+        reason: result.code,
+        result: "failure",
+        target
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.DIAGNOSIS_SAVE_RESULT, {
+      attached_to_plant: Boolean(result.data.userPlantId),
+      result: "success",
+      target
+    });
     setSavedDiagnosis(result.data);
     setMessage(
       result.data.userPlantId
@@ -265,7 +279,12 @@ function PremiumDiagnosisResultScreen() {
                     accessibilityLabel={`Attach diagnosis to ${plant.displayName}`}
                     accessibilityRole="button"
                     key={plant.id}
-                    onPress={() => setSelectedPlantId(plant.id)}
+                    onPress={() => {
+                      setSelectedPlantId(plant.id);
+                      void trackAction(ANALYTICS_EVENTS.DIAGNOSIS_ATTACH_SELECT, {
+                        source: "diagnosis_result"
+                      });
+                    }}
                     style={[
                       styles.plantChoice,
                       selectedPlantId === plant.id ? styles.plantChoiceActive : null

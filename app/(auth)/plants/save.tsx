@@ -43,6 +43,10 @@ import {
 } from "@/lib/notifications/careReminders";
 import { PlantEnvironmentFields } from "@/components/plants/PlantEnvironmentFields";
 import { useOnboarding } from "@/providers/OnboardingProvider";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import type {
   CollectionSpeciesSummary,
   LightExposure,
@@ -135,6 +139,11 @@ function PremiumSavePlantScreen() {
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
+    void trackAction(ANALYTICS_EVENTS.LIBRARY_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "plant_save"
+    });
+
     if (!permission.granted) {
       setMessage("Photo library access is needed to choose a plant photo.");
       return;
@@ -148,23 +157,44 @@ function PremiumSavePlantScreen() {
     });
 
     if (picked.canceled) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        result: "cancelled",
+        source: "library",
+        surface: "plant_save"
+      });
       return;
     }
 
     const asset = picked.assets[0];
 
     if (!asset?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        reason: "missing_photo",
+        result: "failure",
+        source: "library",
+        surface: "plant_save"
+      });
       setMessage("That image could not be loaded.");
       return;
     }
 
     setPhotoUri(await preparePhoto(asset.uri, asset.width, asset.height));
+    void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+      result: "success",
+      source: "library",
+      surface: "plant_save"
+    });
   }
 
   async function takePhoto() {
     setMessage(null);
 
     const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    void trackAction(ANALYTICS_EVENTS.CAMERA_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "plant_save"
+    });
 
     if (!permission.granted) {
       setMessage("Camera access is needed to take a plant photo.");
@@ -178,17 +208,33 @@ function PremiumSavePlantScreen() {
     });
 
     if (captured.canceled) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        result: "cancelled",
+        source: "camera",
+        surface: "plant_save"
+      });
       return;
     }
 
     const asset = captured.assets[0];
 
     if (!asset?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+        reason: "missing_photo",
+        result: "failure",
+        source: "camera",
+        surface: "plant_save"
+      });
       setMessage("The camera could not capture a photo.");
       return;
     }
 
     setPhotoUri(await preparePhoto(asset.uri, asset.width, asset.height));
+    void trackAction(ANALYTICS_EVENTS.PLANT_PHOTO_REPLACEMENT, {
+      result: "success",
+      source: "camera",
+      surface: "plant_save"
+    });
   }
 
   async function savePlant() {
@@ -206,6 +252,10 @@ function PremiumSavePlantScreen() {
     if (!allowance.allowed) {
       setIsSaving(false);
       setLimitMessage(allowance.message);
+      void trackAction(ANALYTICS_EVENTS.PLANT_SAVE_RESULT, {
+        reason: "limit",
+        result: "failure"
+      });
       return;
     }
 
@@ -217,6 +267,10 @@ function PremiumSavePlantScreen() {
     } catch {
       setIsSaving(false);
       setMessage("Plant photo could not be prepared. Please choose another photo.");
+      void trackAction(ANALYTICS_EVENTS.PLANT_SAVE_RESULT, {
+        reason: "photo_prepare",
+        result: "failure"
+      });
       return;
     }
 
@@ -235,8 +289,16 @@ function PremiumSavePlantScreen() {
 
     if (!result.ok) {
       setMessage(result.message);
+      void trackAction(ANALYTICS_EVENTS.PLANT_SAVE_RESULT, {
+        reason: result.code,
+        result: "failure"
+      });
       return;
     }
+
+    void trackAction(ANALYTICS_EVENTS.PLANT_SAVE_RESULT, {
+      result: "success"
+    });
 
     // One-time trial intro after the very first plant (Phase 12/13): shown as
     // a celebration, dismissible, and never auto-shown again.
@@ -324,6 +386,11 @@ function PremiumSavePlantScreen() {
           text: "Enable reminders",
           onPress: async () => {
             const reminderResult = await requestAndEnableCareReminders();
+            void trackAction(ANALYTICS_EVENTS.CARE_REMINDER_TOGGLE, {
+              enabled: reminderResult.ok,
+              result: reminderResult.ok ? "success" : "failure",
+              source: "plant_saved_prompt"
+            });
 
             if (!reminderResult.ok) {
               Alert.alert("Reminders unavailable", reminderResult.message, [

@@ -4,6 +4,10 @@ import { router } from "expo-router";
 
 import { Button } from "@/components/ui/Button";
 import { theme } from "@/constants/theme";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 
 type UpgradePromptProps = {
   title?: string;
@@ -11,6 +15,7 @@ type UpgradePromptProps = {
   onDismiss: () => void;
   onUpgrade?: () => void;
   dismissLabel?: string;
+  analyticsSource?: string;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -25,8 +30,16 @@ export function UpgradePrompt({
   onDismiss,
   onUpgrade,
   dismissLabel = "Maybe later",
+  analyticsSource = "upgrade_prompt",
   style
 }: UpgradePromptProps) {
+  function handleUpgrade() {
+    void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+      source: analyticsSource
+    });
+    (onUpgrade ?? (() => router.push("/(auth)/premium" as never)))();
+  }
+
   return (
     <View style={[styles.card, style]}>
       <View style={styles.titleRow}>
@@ -53,7 +66,7 @@ export function UpgradePrompt({
           gradient
           icon="arrow-up-circle-outline"
           label="Upgrade"
-          onPress={onUpgrade ?? (() => router.push("/(auth)/premium" as never))}
+          onPress={handleUpgrade}
           style={styles.action}
         />
       </View>

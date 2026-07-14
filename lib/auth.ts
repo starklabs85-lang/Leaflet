@@ -6,6 +6,9 @@ import { env, getGoogleConfigIssue, hasGoogleConfig } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
 
 type GoogleSignInModule = typeof import("@react-native-google-signin/google-signin");
+type DeleteAccountResponse =
+  | { ok: true }
+  | { ok: false; error?: { code?: string; message?: string } };
 
 let googleSignInModule: GoogleSignInModule | null = null;
 let googleConfigured = false;
@@ -161,4 +164,66 @@ export async function signOutOfNativeProviders() {
   } catch {
     // Supabase sign-out is the source of truth. Native provider cleanup is best-effort.
   }
+}
+
+export async function deleteAccount() {
+  const supabase = getSupabaseClient();
+  const {
+    data: { session },
+    error: sessionError
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  if (!session) {
+    throw new Error("Please sign in again before deleting your account.");
+  }
+
+  const { data, error } = await supabase.functions.invoke<DeleteAccountResponse>(
+    "delete-account",
+    {
+      body: {}
+    }
+  );
+
+  if (error) {
+    const structured = await parseDeleteAccountError(error);
+    throw new Error(
+      structured ??
+        error.message ??
+        "Fernly could not delete your account. Please try again."
+    );
+  }
+
+  if (!data?.ok) {
+    throw new Error(
+      data?.error?.message ??
+        "Fernly could not delete your account. Please try again."
+    );
+  }
+}
+
+async function parseDeleteAccountError(error: unknown) {
+  const context =
+    typeof error === "object" && error !== null && "context" in error
+      ? (error as { context: unknown }).context
+      : null;
+
+  if (!(context instanceof Response)) {
+    return null;
+  }
+
+  try {
+    const payload = (await context.clone().json()) as DeleteAccountResponse;
+
+    if (payload && payload.ok === false && payload.error?.message) {
+      return payload.error.message;
+    }
+  } catch {
+    // Body was not the function's JSON error shape; fall through.
+  }
+
+  return null;
 }

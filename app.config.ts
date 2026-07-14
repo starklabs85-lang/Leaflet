@@ -10,8 +10,10 @@ const config: ExpoConfig = {
   orientation: "portrait",
   userInterfaceStyle: "light",
   newArchEnabled: true,
+  icon: "./FlexLeaf Plant Analyzer Creatives.png",
   ios: {
     supportsTablet: true,
+    icon: "./FlexLeaf Plant Analyzer Creatives.png",
     bundleIdentifier: "com.countrybean.leaflet",
     usesAppleSignIn: true,
     googleServicesFile: "./GoogleService-Info.plist",
@@ -20,8 +22,7 @@ const config: ExpoConfig = {
     }
   },
   android: {
-    package: "com.countrybean.leaflet",
-    googleServicesFile: "./google-services.json"
+    package: "com.countrybean.leaflet"
   },
   plugins: [
     "expo-router",
@@ -40,7 +41,7 @@ const config: ExpoConfig = {
         isAndroidBackgroundLocationEnabled: false
       }
     ],
-    "@react-native-firebase/app",
+    "./plugins/withIosFirebaseApp",
     [
       "@react-native-firebase/analytics",
       {

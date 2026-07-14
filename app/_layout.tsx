@@ -18,11 +18,20 @@ import {
 
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { theme } from "@/constants/theme";
+import {
+  clearAnalyticsUser,
+  setAnalyticsUser
+} from "@/lib/analytics/firebaseAnalytics";
 import { useFirebaseScreenTracking } from "@/lib/analytics/useFirebaseScreenTracking";
 import { useCareReminderNotificationRouting } from "@/lib/notifications/careReminders";
+import { getCareReminderSettings } from "@/lib/notifications/careReminders";
+import { getStoredUserLocation } from "@/lib/location/userLocation";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { ConnectivityProvider } from "@/providers/ConnectivityProvider";
-import { EntitlementProvider } from "@/providers/EntitlementProvider";
+import {
+  EntitlementProvider,
+  useEntitlement
+} from "@/providers/EntitlementProvider";
 import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
 
 // Keep the native splash visible until the brand fonts are ready so we never
@@ -69,6 +78,7 @@ export default function RootLayout() {
         <EntitlementProvider>
           <OnboardingProvider>
             <ConnectivityProvider>
+              <AnalyticsIdentitySync />
               <AuthGate />
             </ConnectivityProvider>
           </OnboardingProvider>
@@ -76,6 +86,49 @@ export default function RootLayout() {
       </AuthProvider>
     </SafeAreaProvider>
   );
+}
+
+function AnalyticsIdentitySync() {
+  const { status, user } = useAuth();
+  const entitlement = useEntitlement();
+  const onboarding = useOnboarding();
+  const authProvider = getAnalyticsAuthProvider(user);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function syncIdentity() {
+      if (status !== "authenticated" || !user?.id) {
+        await clearAnalyticsUser();
+        return;
+      }
+
+      const [reminderSettings, weatherLocation] = await Promise.all([
+        getCareReminderSettings().catch(() => null),
+        getStoredUserLocation().catch(() => null)
+      ]);
+
+      if (!isActive) {
+        return;
+      }
+
+      await setAnalyticsUser(user.id, {
+        auth_provider: authProvider,
+        care_reminders_enabled: reminderSettings?.enabled ?? null,
+        onboarding_status: onboarding.status,
+        premium_status: entitlement.isPremium ? "premium" : "free",
+        weather_location_source: weatherLocation?.source ?? "none"
+      });
+    }
+
+    void syncIdentity();
+
+    return () => {
+      isActive = false;
+    };
+  }, [authProvider, entitlement.isPremium, onboarding.status, status, user?.id]);
+
+  return null;
 }
 
 function AuthGate() {
@@ -122,6 +175,19 @@ function AuthGate() {
       <StatusBar style="dark" />
     </>
   );
+}
+
+function getAnalyticsAuthProvider(user: ReturnType<typeof useAuth>["user"]) {
+  const provider =
+    typeof user?.app_metadata?.provider === "string"
+      ? user.app_metadata.provider
+      : undefined;
+
+  if (provider === "apple" || provider === "google") {
+    return provider;
+  }
+
+  return "unknown";
 }
 
 function getPendingAuthRedirect(

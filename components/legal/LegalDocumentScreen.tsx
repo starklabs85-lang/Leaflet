@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Card } from "@/components/ui/Card";
@@ -9,11 +10,13 @@ import { LEGAL_LAST_UPDATED } from "@/constants/legal";
 import { theme } from "@/constants/theme";
 
 type LegalDocumentScreenProps = {
+  footer?: ReactNode;
   sections: readonly { title: string; body: string }[];
   title: string;
 };
 
 export function LegalDocumentScreen({
+  footer,
   sections,
   title
 }: LegalDocumentScreenProps) {
@@ -46,6 +49,7 @@ export function LegalDocumentScreen({
           </Card>
         ))}
       </View>
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </Screen>
   );
 }
@@ -76,6 +80,9 @@ const styles = StyleSheet.create({
   },
   sections: {
     gap: theme.spacing.md,
+    marginTop: theme.spacing.xl
+  },
+  footer: {
     marginTop: theme.spacing.xl
   },
   sectionTitle: {

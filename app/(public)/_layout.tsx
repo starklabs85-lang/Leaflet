@@ -8,6 +8,7 @@ export default function PublicLayout() {
       <Stack.Screen name="onboarding/intent" />
       <Stack.Screen name="onboarding/sign-in" />
       <Stack.Screen name="legal/privacy" />
+      <Stack.Screen name="legal/eula" />
       <Stack.Screen name="legal/terms" />
     </Stack>
   );

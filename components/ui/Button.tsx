@@ -8,7 +8,10 @@ import {
   type ViewStyle
 } from "react-native";
 
-import { PressableScale } from "@/components/ui/PressableScale";
+import {
+  PressableScale,
+  type PressableAnalytics
+} from "@/components/ui/PressableScale";
 import { theme } from "@/constants/theme";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
@@ -25,6 +28,7 @@ type ButtonProps = {
   disabled?: boolean;
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
+  analytics?: PressableAnalytics;
   accessibilityLabel?: string;
   accessibilityHint?: string;
 };
@@ -45,6 +49,7 @@ export function Button({
   disabled = false,
   fullWidth = true,
   style,
+  analytics,
   accessibilityLabel,
   accessibilityHint
 }: ButtonProps) {
@@ -61,6 +66,7 @@ export function Button({
       accessibilityState={{ busy: loading, disabled: isDisabled }}
       containerStyle={fullWidth ? styles.fullWidth : styles.auto}
       disabled={isDisabled}
+      analytics={analytics}
       onPress={onPress}
       style={[
         styles.base,

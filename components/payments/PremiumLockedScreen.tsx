@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { IconChip } from "@/components/ui/IconChip";
 import { Screen } from "@/components/ui/Screen";
 import { theme } from "@/constants/theme";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 
 type PremiumLockedScreenProps = {
   title: string;
@@ -13,6 +17,7 @@ type PremiumLockedScreenProps = {
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   secondaryLabel?: string;
   onSecondaryPress?: () => void;
+  analyticsSource?: string;
 };
 
 export function PremiumLockedScreen({
@@ -20,8 +25,16 @@ export function PremiumLockedScreen({
   message,
   icon = "lock-outline",
   secondaryLabel = "Scan a plant",
-  onSecondaryPress = () => router.push("/(auth)/(tabs)/scan" as never)
+  onSecondaryPress = () => router.push("/(auth)/(tabs)/scan" as never),
+  analyticsSource = "premium_locked"
 }: PremiumLockedScreenProps) {
+  function openPremium() {
+    void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+      source: analyticsSource
+    });
+    router.push("/(auth)/premium" as never);
+  }
+
   return (
     <Screen contentContainerStyle={styles.content}>
       <IconChip icon={icon} size={72} />
@@ -34,7 +47,7 @@ export function PremiumLockedScreen({
           gradient
           icon="arrow-up-circle-outline"
           label="Upgrade to Premium"
-          onPress={() => router.push("/(auth)/premium" as never)}
+          onPress={openPremium}
         />
         <Button
           accessibilityLabel={secondaryLabel}

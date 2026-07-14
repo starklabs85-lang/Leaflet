@@ -9,6 +9,10 @@ import {
 } from "react";
 
 import { secureStorageAdapter } from "@/lib/secure-storage";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 
 export type OnboardingIntent = "new_plant_parent" | "growing_collector";
 
@@ -85,11 +89,15 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
   const setIntent = useCallback(async (nextIntent: OnboardingIntent) => {
     setStoredIntent(nextIntent);
     await secureStorageAdapter.setItem(ONBOARDING_INTENT_KEY, nextIntent);
+    void trackAction(ANALYTICS_EVENTS.ONBOARDING_INTENT_SELECT, {
+      intent: nextIntent
+    });
   }, []);
 
   const skip = useCallback(async () => {
     await secureStorageAdapter.setItem(ONBOARDING_SKIPPED_KEY, "true");
     setStatus("skipped");
+    void trackAction(ANALYTICS_EVENTS.ONBOARDING_SKIP);
   }, []);
 
   const completeAfterPlantSave = useCallback(
@@ -113,6 +121,9 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
 
       setActivationContext(nextContext);
       setStatus("complete");
+      void trackAction(ANALYTICS_EVENTS.ONBOARDING_COMPLETE, {
+        method: "plant_save"
+      });
 
       return !wasComplete;
     },
@@ -128,6 +139,9 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
 
     setActivationContext(null);
     setStatus("complete");
+    void trackAction(ANALYTICS_EVENTS.ONBOARDING_COMPLETE, {
+      method: "free_scan"
+    });
   }, []);
 
   const value = useMemo<OnboardingContextValue>(

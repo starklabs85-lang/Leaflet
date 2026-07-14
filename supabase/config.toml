@@ -6,6 +6,9 @@ verify_jwt = true
 [functions.weather-tips]
 verify_jwt = true
 
+[functions.delete-account]
+verify_jwt = true
+
 # RevenueCat calls this with its own shared-secret Authorization header, not a
 # Supabase JWT; the function verifies REVENUECAT_WEBHOOK_SECRET itself.
 [functions.revenuecat-webhook]

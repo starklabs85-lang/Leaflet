@@ -16,6 +16,11 @@ import {
   applyWeatherCareAdjustment,
   getLocalDateString
 } from "@/lib/api/careSchedule";
+import {
+  ANALYTICS_EVENTS,
+  setAnalyticsUser,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 import { fetchWeatherTips } from "@/lib/api/weatherTips";
 import {
   captureDeviceLocation,
@@ -31,6 +36,7 @@ import type {
   WeatherTipSeverity,
   WeatherTipsResponse
 } from "@/types/weather";
+import { useAuth } from "@/providers/AuthProvider";
 
 type WeatherState =
   | { status: "checking" }
@@ -52,6 +58,7 @@ export function TodayNearYou({
   hasPlants: boolean;
   onCareTaskAdjusted?: () => void;
 }) {
+  const auth = useAuth();
   const [state, setState] = useState<WeatherState>({ status: "checking" });
   const [showCityInput, setShowCityInput] = useState(false);
   const [cityDraft, setCityDraft] = useState("");
@@ -109,11 +116,25 @@ export function TodayNearYou({
     setSetupBusy(false);
 
     if (!result.ok) {
+      void trackAction(ANALYTICS_EVENTS.WEATHER_LOCATION_SET, {
+        reason: result.code,
+        result: "failure",
+        source: "gps"
+      });
       setSetupMessage(result.message);
       setShowCityInput(true);
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.WEATHER_LOCATION_SET, {
+      result: "success",
+      source: result.location.source
+    });
+    if (auth.user?.id) {
+      void setAnalyticsUser(auth.user.id, {
+        weather_location_source: result.location.source
+      });
+    }
     loadWeather(result.location);
   }
 
@@ -127,10 +148,24 @@ export function TodayNearYou({
     setSetupBusy(false);
 
     if (!result.ok) {
+      void trackAction(ANALYTICS_EVENTS.WEATHER_LOCATION_SET, {
+        reason: result.code,
+        result: "failure",
+        source: "manual"
+      });
       setSetupMessage(result.message);
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.WEATHER_LOCATION_SET, {
+      result: "success",
+      source: result.location.source
+    });
+    if (auth.user?.id) {
+      void setAnalyticsUser(auth.user.id, {
+        weather_location_source: result.location.source
+      });
+    }
     setShowCityInput(false);
     loadWeather(result.location);
   }
@@ -142,6 +177,11 @@ export function TodayNearYou({
 
     setPendingTipId(tip.id);
     setActionMessage(null);
+    void trackAction(ANALYTICS_EVENTS.WEATHER_TIP_ACTION, {
+      action_kind: tip.action.kind,
+      days: tip.action.days,
+      result: "start"
+    });
 
     const result = await applyWeatherCareAdjustment({
       taskId: tip.action.taskId,
@@ -152,10 +192,18 @@ export function TodayNearYou({
     setPendingTipId(null);
 
     if (!result.ok) {
+      void trackAction(ANALYTICS_EVENTS.WEATHER_TIP_ACTION, {
+        action_kind: tip.action.kind,
+        result: "failure"
+      });
       setActionMessage(result.message);
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.WEATHER_TIP_ACTION, {
+      action_kind: tip.action.kind,
+      result: "success"
+    });
     setActionMessage(
       tip.action.kind === "snooze_watering"
         ? `Watering snoozed until ${result.data.nextDueDate}.`

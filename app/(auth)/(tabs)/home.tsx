@@ -30,6 +30,10 @@ import { TodayNearYou } from "@/components/weather/TodayNearYou";
 import { fetchDashboardData } from "@/lib/api/dashboard";
 import { formatCareType, quickLogCare } from "@/lib/api/careSchedule";
 import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
+import {
   getPendingStreakMilestone,
   markStreakMilestoneCelebrated,
   type StreakMilestone
@@ -149,9 +153,20 @@ function PremiumHomeScreen() {
             : result.message
         });
       }
+      void trackAction(ANALYTICS_EVENTS.TODAY_TASK_COMPLETE, {
+        reason: result.code,
+        result: "failure",
+        source: "home",
+        task_type: task.type
+      });
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.TODAY_TASK_COMPLETE, {
+      result: "success",
+      source: "home",
+      task_type: task.type
+    });
     setLoadState((current) => {
       if (current.status !== "ready") {
         return current;

@@ -70,7 +70,7 @@ export default function PremiumIntroScreen() {
         tips, and growth photos.
       </Text>
 
-      <PremiumContent onPurchased={continueOnward} />
+      <PremiumContent onPurchased={continueOnward} source="premium_intro" />
     </Screen>
   );
 }

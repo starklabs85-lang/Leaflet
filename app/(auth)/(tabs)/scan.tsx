@@ -25,6 +25,10 @@ import { IconChip } from "@/components/ui/IconChip";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { theme } from "@/constants/theme";
 import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
+import {
   diagnosePlantPhoto,
   fetchDiagnosisSpeciesContext
 } from "@/lib/api/diagnosis";
@@ -43,6 +47,7 @@ import type {
 } from "@/types/identifyPlant";
 
 type CapturedPhoto = {
+  source: "camera" | "library";
   uri: string;
   width?: number;
   height?: number;
@@ -120,6 +125,10 @@ export default function ScanScreen() {
 
     setMode(nextMode);
     setErrorMessage(null);
+    void trackAction(ANALYTICS_EVENTS.SCAN_MODE_CHANGE, {
+      from_mode: mode,
+      to_mode: nextMode
+    });
   }
 
   async function capturePhoto() {
@@ -127,6 +136,11 @@ export default function ScanScreen() {
 
     if (!cameraPermission?.granted) {
       const permission = await requestCameraPermission();
+
+      void trackAction(ANALYTICS_EVENTS.CAMERA_PERMISSION_RESULT, {
+        result: permission.granted ? "granted" : "denied",
+        source: "scan"
+      });
 
       if (!permission.granted) {
         setErrorMessage("Camera access is needed to take a plant photo.");
@@ -140,11 +154,21 @@ export default function ScanScreen() {
     });
 
     if (!captured?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PHOTO_CAPTURE, {
+        mode,
+        reason: "missing_photo",
+        result: "failure"
+      });
       setErrorMessage("The camera could not capture a photo. Please try again.");
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.PHOTO_CAPTURE, {
+      mode,
+      result: "success"
+    });
     setPhoto({
+      source: "camera",
       uri: captured.uri,
       width: captured.width,
       height: captured.height
@@ -156,6 +180,11 @@ export default function ScanScreen() {
     setErrorMessage(null);
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    void trackAction(ANALYTICS_EVENTS.LIBRARY_PERMISSION_RESULT, {
+      result: permission.granted ? "granted" : "denied",
+      source: "scan"
+    });
 
     if (!permission.granted) {
       setErrorMessage("Photo library access is needed to choose an image.");
@@ -170,17 +199,31 @@ export default function ScanScreen() {
     });
 
     if (picked.canceled) {
+      void trackAction(ANALYTICS_EVENTS.PHOTO_PICK, {
+        mode,
+        result: "cancelled"
+      });
       return;
     }
 
     const asset = picked.assets[0];
 
     if (!asset?.uri) {
+      void trackAction(ANALYTICS_EVENTS.PHOTO_PICK, {
+        mode,
+        reason: "missing_photo",
+        result: "failure"
+      });
       setErrorMessage("That image could not be loaded. Please choose another.");
       return;
     }
 
+    void trackAction(ANALYTICS_EVENTS.PHOTO_PICK, {
+      mode,
+      result: "success"
+    });
     setPhoto({
+      source: "library",
       uri: asset.uri,
       width: asset.width,
       height: asset.height
@@ -200,6 +243,11 @@ export default function ScanScreen() {
     setResult(null);
     setSelectedAlternateIndex(null);
     setShowOnboardingPremiumPrompt(false);
+    void trackAction(ANALYTICS_EVENTS.SCAN_SUBMIT, {
+      has_plant_context: Boolean(sourcePlantId),
+      mode,
+      photo_source: photo.source
+    });
 
     // Friendly pre-check; the identify-plant function enforces the same caps
     // server-side, so this only exists to avoid a wasted upload.
@@ -209,6 +257,10 @@ export default function ScanScreen() {
         : await checkDiagnoseScanAllowance(isPremium);
 
     if (!allowance.allowed) {
+      void trackAction(ANALYTICS_EVENTS.FREE_LIMIT_HIT, {
+        mode,
+        stage: "precheck"
+      });
       setLimitMessage(allowance.message);
       setLimitTitle(mode === "diagnose" ? "Premium required" : null);
       setStep("limit");
@@ -231,6 +283,11 @@ export default function ScanScreen() {
             response.error.code === "free_limit_reached" ||
             response.error.code === "premium_required"
           ) {
+            void trackAction(ANALYTICS_EVENTS.FREE_LIMIT_HIT, {
+              mode,
+              reason: response.error.code,
+              stage: "server"
+            });
             setLimitMessage(response.error.message);
             setLimitTitle(
               response.error.code === "premium_required" ? "Premium required" : null
@@ -239,17 +296,31 @@ export default function ScanScreen() {
             return;
           }
 
+          void trackAction(ANALYTICS_EVENTS.IDENTIFY_RESULT, {
+            reason: response.error.code,
+            result: "failure"
+          });
           setErrorMessage(getScanErrorMessage(response.error.message, mode));
           setStep("error");
           return;
         }
 
         if (response.data.scanType !== "identify") {
+          void trackAction(ANALYTICS_EVENTS.IDENTIFY_RESULT, {
+            reason: "invalid_scan_type",
+            result: "failure"
+          });
           setErrorMessage("Identification result could not be read.");
           setStep("error");
           return;
         }
 
+        void trackAction(ANALYTICS_EVENTS.IDENTIFY_RESULT, {
+          has_species_profile:
+            response.data.result.isPlant && Boolean(response.data.result.speciesId),
+          is_plant: response.data.result.isPlant,
+          result: "success"
+        });
         setResult(response.data.result);
         if (!isPremium && onboarding.status === "needs_onboarding") {
           setShowOnboardingPremiumPrompt(true);
@@ -261,6 +332,11 @@ export default function ScanScreen() {
       const contextResult = await fetchDiagnosisSpeciesContext(sourcePlantId);
 
       if (!contextResult.ok) {
+        void trackAction(ANALYTICS_EVENTS.DIAGNOSE_RESULT, {
+          reason: contextResult.code,
+          result: "failure",
+          stage: "context"
+        });
         setErrorMessage(contextResult.message);
         setStep("error");
         return;
@@ -277,6 +353,11 @@ export default function ScanScreen() {
           response.code === "free_limit_reached" ||
           response.code === "premium_required"
         ) {
+          void trackAction(ANALYTICS_EVENTS.FREE_LIMIT_HIT, {
+            mode,
+            reason: response.code,
+            stage: "server"
+          });
           setLimitMessage(response.message);
           setLimitTitle(
             response.code === "premium_required" ? "Premium required" : null
@@ -285,11 +366,19 @@ export default function ScanScreen() {
           return;
         }
 
+        void trackAction(ANALYTICS_EVENTS.DIAGNOSE_RESULT, {
+          reason: response.code,
+          result: "failure",
+          stage: "diagnose"
+        });
         setErrorMessage(getScanErrorMessage(response.message, mode));
         setStep("error");
         return;
       }
 
+      void trackAction(ANALYTICS_EVENTS.DIAGNOSE_RESULT, {
+        result: "success"
+      });
       const draft = createDiagnosisDraft({
         photoUri: compressed.uri,
         result: response.data.result,
@@ -302,12 +391,27 @@ export default function ScanScreen() {
         params: { draftId: draft.id }
       });
     } catch (error) {
+      void trackAction(
+        mode === "identify"
+          ? ANALYTICS_EVENTS.IDENTIFY_RESULT
+          : ANALYTICS_EVENTS.DIAGNOSE_RESULT,
+        {
+          reason: getScanFailureReason(error),
+          result: "failure"
+        }
+      );
       setErrorMessage(getScanErrorMessage(error, mode));
       setStep("error");
     }
   }
 
   function resetScan() {
+    if (step !== "camera" || photo || result || errorMessage || limitMessage) {
+      void trackAction(ANALYTICS_EVENTS.SCAN_AGAIN, {
+        from_step: step,
+        mode
+      });
+    }
     setPhoto(null);
     setResult(null);
     setSelectedAlternateIndex(null);
@@ -335,6 +439,9 @@ export default function ScanScreen() {
   async function upgradeAfterFreeScan() {
     setShowOnboardingPremiumPrompt(false);
     await completeFreeScanOnboarding();
+    void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+      source: "onboarding_scan_result"
+    });
     router.push("/(auth)/premium" as never);
   }
 
@@ -352,7 +459,14 @@ export default function ScanScreen() {
         title="Diagnosis requires Premium"
         message="Identify remains available once per day. Premium unlocks disease and pest diagnosis before any photo is uploaded."
         secondaryLabel="Identify instead"
-        onSecondaryPress={() => setMode("identify")}
+        onSecondaryPress={() => {
+          void trackAction(ANALYTICS_EVENTS.SCAN_MODE_CHANGE, {
+            from_mode: "diagnose",
+            source: "premium_locked",
+            to_mode: "identify"
+          });
+          setMode("identify");
+        }}
       />
     );
   }
@@ -415,6 +529,7 @@ export default function ScanScreen() {
           <Image source={{ uri: photo.uri }} style={styles.resultPhoto} />
           <View style={styles.resultPanel}>
             <UpgradePrompt
+              analyticsSource="scan_limit"
               title={limitTitle ?? undefined}
               message={
                 limitMessage ??
@@ -467,9 +582,10 @@ export default function ScanScreen() {
           ) : null}
           {showOnboardingPremiumPrompt ? (
             <View style={styles.resultPanel}>
-              <UpgradePrompt
-                title="Unlock the rest of Fernly"
-                message="Your first identification result is ready. Premium unlocks saving this plant, care info, diagnosis, reminders, weather tips, and growth photos."
+            <UpgradePrompt
+              analyticsSource="onboarding_scan_result"
+              title="Unlock the rest of Fernly"
+              message="Your first identification result is ready. Premium unlocks saving this plant, care info, diagnosis, reminders, weather tips, and growth photos."
                 dismissLabel="Continue with free"
                 onDismiss={continueAfterFreeScan}
                 onUpgrade={upgradeAfterFreeScan}
@@ -657,7 +773,12 @@ function PlantResult({
   const confidence = getConfidenceLabel(result.primary.confidence);
   const hasSpeciesProfile = Boolean(result.speciesId);
 
-  function openPremium() {
+  function openPremium(reason: "care_info" | "save_plant") {
+    void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+      reason,
+      source: "scan_result"
+    });
+
     if (onPremiumAction) {
       onPremiumAction();
       return;
@@ -701,9 +822,15 @@ function PlantResult({
               key={`${alternate.scientificName}-${index}`}
               alternate={alternate}
               selected={selectedAlternateIndex === index}
-              onPress={() =>
-                onSelectAlternate(selectedAlternateIndex === index ? null : index)
-              }
+              onPress={() => {
+                const isSelecting = selectedAlternateIndex !== index;
+
+                void trackAction(ANALYTICS_EVENTS.ALTERNATE_SELECTED, {
+                  alternate_rank: index + 1,
+                  selected: isSelecting
+                });
+                onSelectAlternate(isSelecting ? index : null);
+              }}
             />
           ))}
         </View>
@@ -717,7 +844,7 @@ function PlantResult({
           label={isPremium ? "Add to my plants" : "Save with Premium"}
           onPress={() =>
             !isPremium
-              ? openPremium()
+              ? openPremium("save_plant")
               : result.speciesId
                 ? router.push({
                     pathname: "/(auth)/plants/save" as never,
@@ -742,7 +869,7 @@ function PlantResult({
           }
           onPress={() =>
             !isPremium
-              ? openPremium()
+              ? openPremium("care_info")
               : result.speciesId
                 ? router.push({
                     pathname: "/(auth)/species/[speciesId]" as never,
@@ -959,6 +1086,37 @@ function getScanErrorMessage(error: unknown, mode: ScanMode) {
   }
 
   return fallback;
+}
+
+function getScanFailureReason(error: unknown) {
+  const message =
+    typeof error === "string"
+      ? error.toLowerCase()
+      : error instanceof Error
+        ? error.message.toLowerCase()
+        : "";
+
+  if (
+    message.includes("network") ||
+    message.includes("fetch") ||
+    message.includes("offline")
+  ) {
+    return "network";
+  }
+
+  if (message.includes("timeout") || message.includes("timed out")) {
+    return "timeout";
+  }
+
+  if (
+    message.includes("too large") ||
+    message.includes("invalid") ||
+    message.includes("validation")
+  ) {
+    return "validation";
+  }
+
+  return "unknown";
 }
 
 function getConfidenceLabel(confidence: number): { label: string; tone: BadgeTone } {

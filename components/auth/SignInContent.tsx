@@ -17,6 +17,10 @@ import { PlaceholderScreen } from "@/components/PlaceholderScreen";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { LEGAL_ROUTES } from "@/constants/legal";
 import { theme } from "@/constants/theme";
+import {
+  ANALYTICS_TAPS,
+  trackTap
+} from "@/lib/analytics/firebaseAnalytics";
 import { useAuth } from "@/providers/AuthProvider";
 
 type SignInContentProps = {
@@ -36,6 +40,8 @@ export function SignInContent({
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const isMissingConfig = auth.status === "missing-config";
   const isAuthDisabled = auth.isLoading || isMissingConfig;
+  const analyticsSurface =
+    eyebrow === "Fernly" ? "public_sign_in" : "onboarding_sign_in";
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync()
@@ -62,6 +68,13 @@ export function SignInContent({
     </LinearGradient>
   );
 
+  function handleAppleSignIn() {
+    void trackTap(ANALYTICS_TAPS.SIGN_IN_APPLE_BUTTON, {
+      surface: analyticsSurface
+    });
+    void auth.signInWithApple();
+  }
+
   return (
     <PlaceholderScreen body={body} eyebrow={eyebrow} illustration={hero} title={title}>
       {isAppleAvailable ? (
@@ -69,7 +82,7 @@ export function SignInContent({
           buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
           buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
           cornerRadius={theme.radius.lg}
-          onPress={isAuthDisabled ? () => undefined : auth.signInWithApple}
+          onPress={isAuthDisabled ? () => undefined : handleAppleSignIn}
           style={[styles.appleButton, isAuthDisabled && styles.disabled]}
         />
       ) : null}
@@ -77,6 +90,10 @@ export function SignInContent({
       <PressableScale
         accessibilityLabel="Continue with Google"
         accessibilityRole="button"
+        analytics={{
+          tapName: ANALYTICS_TAPS.SIGN_IN_GOOGLE_BUTTON,
+          params: { surface: analyticsSurface }
+        }}
         disabled={isAuthDisabled}
         onPress={auth.signInWithGoogle}
         style={[styles.googleButton, isAuthDisabled && styles.disabled]}
@@ -96,13 +113,18 @@ export function SignInContent({
       </PressableScale>
 
       <Text style={styles.helperText}>
-        By continuing, you agree to Fernly's Terms and Privacy Policy.
+        By continuing, you agree to Fernly's Terms, Privacy Policy, and
+        Standard EULA.
       </Text>
 
       <View style={styles.legalRow}>
         <PressableScale
           accessibilityLabel="Open Privacy Policy"
           accessibilityRole="link"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_PRIVACY_LINK,
+            params: { surface: analyticsSurface }
+          }}
           haptic={false}
           onPress={() => router.push(LEGAL_ROUTES.privacy as never)}
           style={styles.legalLink}
@@ -110,8 +132,25 @@ export function SignInContent({
           <Text style={styles.legalLinkText}>Privacy Policy</Text>
         </PressableScale>
         <PressableScale
+          accessibilityLabel="Open Standard EULA"
+          accessibilityRole="link"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_EULA_LINK,
+            params: { surface: analyticsSurface }
+          }}
+          haptic={false}
+          onPress={() => router.push(LEGAL_ROUTES.eula as never)}
+          style={styles.legalLink}
+        >
+          <Text style={styles.legalLinkText}>Standard EULA</Text>
+        </PressableScale>
+        <PressableScale
           accessibilityLabel="Open Terms of Service"
           accessibilityRole="link"
+          analytics={{
+            tapName: ANALYTICS_TAPS.LEGAL_TERMS_LINK,
+            params: { surface: analyticsSurface }
+          }}
           haptic={false}
           onPress={() => router.push(LEGAL_ROUTES.terms as never)}
           style={styles.legalLink}
@@ -282,7 +321,9 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   legalRow: {
+    alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.spacing.md,
     justifyContent: "center",
     marginTop: theme.spacing.md
