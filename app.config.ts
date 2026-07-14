@@ -1,12 +1,16 @@
 import type { ExpoConfig } from "expo/config";
 
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME;
+const cameraPermission =
+  "Fernly uses your camera to take plant photos for identification, health diagnosis, and growth tracking—for example, photographing a leaf to identify the plant or check for disease.";
+const photoLibraryPermission =
+  "Fernly uses your photo library to choose plant photos for identification, health diagnosis, and growth tracking—for example, selecting a leaf photo to identify the plant or add it to a growth timeline.";
 
 const config: ExpoConfig = {
   name: "Fernly",
   slug: "leaflet",
   scheme: "leaflet",
-  version: "0.1.0",
+  version: "1.0",
   orientation: "portrait",
   userInterfaceStyle: "light",
   newArchEnabled: true,
@@ -29,8 +33,22 @@ const config: ExpoConfig = {
     "expo-font",
     "expo-dev-client",
     "expo-secure-store",
-    "expo-camera",
-    "expo-image-picker",
+    [
+      "expo-camera",
+      {
+        cameraPermission,
+        microphonePermission: false,
+        recordAudioAndroid: false
+      }
+    ],
+    [
+      "expo-image-picker",
+      {
+        cameraPermission,
+        microphonePermission: false,
+        photosPermission: photoLibraryPermission
+      }
+    ],
     "expo-notifications",
     "expo-apple-authentication",
     [
