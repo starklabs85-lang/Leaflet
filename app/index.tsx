@@ -13,7 +13,7 @@ export default function IndexRoute() {
 
   if (auth.status === "authenticated") {
     if (onboarding.status === "needs_onboarding") {
-      return <Redirect href={"/(auth)/onboarding/first-scan" as never} />;
+      return <Redirect href={"/(public)/onboarding/welcome" as never} />;
     }
 
     return <Redirect href="/(auth)/(tabs)/home" />;

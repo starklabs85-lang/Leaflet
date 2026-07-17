@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Linking, Platform, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import type { PurchasesPackage } from "react-native-purchases";
 
@@ -14,6 +15,8 @@ import {
   trackAction
 } from "@/lib/analytics/firebaseAnalytics";
 import { FREE_LIMITS } from "@/lib/payments/limits";
+import { requiresPermanentIdentity } from "@/lib/onboarding/flow";
+import { useAuth } from "@/providers/AuthProvider";
 import { useEntitlement } from "@/providers/EntitlementProvider";
 
 type ComparisonCell =
@@ -87,6 +90,7 @@ export function PremiumContent({
   onPurchased,
   source = "premium_screen"
 }: PremiumContentProps) {
+  const auth = useAuth();
   const {
     isPremium,
     expiresAt,
@@ -96,13 +100,15 @@ export function PremiumContent({
     trialEligibilityByProductId,
     purchase,
     restore,
-    redeemOfferCode
+    redeemOfferCode,
+    syncIdentity
   } = useEntitlement();
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">("annual");
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isRedeemingCode, setIsRedeemingCode] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showIdentityGate, setShowIdentityGate] = useState(false);
 
   const selectedPackage =
     selectedPlan === "annual" ? (annualPackage ?? monthlyPackage) : monthlyPackage;
@@ -122,7 +128,7 @@ export function PremiumContent({
     });
   }, [isPremium, source]);
 
-  async function handlePurchase() {
+  async function performPurchase() {
     if (!selectedPackage || isPurchasing) {
       return;
     }
@@ -153,6 +159,40 @@ export function PremiumContent({
     if (outcome.status === "error") {
       setFeedback(outcome.message);
     }
+  }
+
+  async function handlePurchase() {
+    if (requiresPermanentIdentity(auth.isAnonymous)) {
+      setShowIdentityGate(true);
+      setFeedback("Sign in with Apple or Google before starting your trial.");
+      return;
+    }
+
+    await purchaseForPermanentUser();
+  }
+
+  async function purchaseForPermanentUser() {
+    try {
+      await syncIdentity();
+      await performPurchase();
+    } catch (reason) {
+      setFeedback(
+        reason instanceof Error
+          ? reason.message
+          : "Fernly could not prepare your account for purchase. Please try again."
+      );
+    }
+  }
+
+  async function completeIdentity(provider: "apple" | "google") {
+    const succeeded =
+      provider === "apple"
+        ? await auth.signInWithApple()
+        : await auth.signInWithGoogle();
+
+    if (!succeeded) return;
+    setShowIdentityGate(false);
+    await purchaseForPermanentUser();
   }
 
   async function handleRestore() {
@@ -287,10 +327,36 @@ export function PremiumContent({
             />
           ) : null}
 
+          {showIdentityGate ? (
+            <View style={styles.identityGate}>
+              <Text style={styles.identityTitle}>Sign in to start your trial</Text>
+              <Text style={styles.identityBody}>
+                Your trial and subscription will be attached to your Fernly account.
+              </Text>
+              {Platform.OS === "ios" ? (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                  cornerRadius={theme.radius.lg}
+                  onPress={() => void completeIdentity("apple")}
+                  style={styles.appleButton}
+                />
+              ) : null}
+              <Button
+                disabled={auth.isLoading}
+                icon="google"
+                label="Continue with Google"
+                loading={auth.activeProvider === "google"}
+                onPress={() => void completeIdentity("google")}
+                variant="secondary"
+              />
+            </View>
+          ) : null}
+
           <Button
             accessibilityLabel={
               selectedPackageTrialEligible
-                ? "Start 7-day free trial"
+                ? "Start 3-day free trial"
                 : "Upgrade to Premium"
             }
             disabled={!selectedPackage || isPurchasing}
@@ -300,7 +366,7 @@ export function PremiumContent({
               isPurchasing
                 ? "Connecting to the store..."
                 : selectedPackageTrialEligible
-                  ? "Start 7-day free trial"
+                  ? "Start 3-day free trial"
                   : "Upgrade to Premium"
             }
             loading={isPurchasing}
@@ -309,7 +375,7 @@ export function PremiumContent({
           />
           {selectedPackageTrialEligible ? (
             <Text style={styles.trialHint}>
-              Free for 7 days, then {selectedPackage?.product.priceString ?? ""}
+              Free for 3 days, then {selectedPackage?.product.priceString ?? ""}
               {` per ${selectedPackagePeriod}`}. Cancel
               anytime before the trial ends and you won't be charged.
             </Text>
@@ -638,6 +704,24 @@ const styles = StyleSheet.create({
   },
   purchaseButton: {
     marginTop: theme.spacing.sm
+  },
+  identityGate: {
+    backgroundColor: theme.colors.leafMuted,
+    borderRadius: theme.radius.card,
+    gap: theme.spacing.md,
+    padding: theme.spacing.lg
+  },
+  identityTitle: {
+    ...theme.text.heading,
+    textAlign: "center"
+  },
+  identityBody: {
+    ...theme.text.caption,
+    textAlign: "center"
+  },
+  appleButton: {
+    height: 52,
+    width: "100%"
   },
   trialHint: {
     ...theme.text.caption,

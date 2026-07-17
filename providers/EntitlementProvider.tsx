@@ -34,6 +34,7 @@ import {
   type RestoreOutcome
 } from "@/lib/payments/revenuecat";
 import { useAuth } from "@/providers/AuthProvider";
+import { getSupabaseClient } from "@/lib/supabase";
 
 type EntitlementContextValue = EntitlementSnapshot & {
   isLoading: boolean;
@@ -45,6 +46,7 @@ type EntitlementContextValue = EntitlementSnapshot & {
   restore: () => Promise<RestoreOutcome>;
   redeemOfferCode: () => Promise<OfferCodeRedemptionOutcome>;
   refresh: () => Promise<void>;
+  syncIdentity: () => Promise<void>;
 };
 
 const EntitlementContext = createContext<EntitlementContextValue | null>(null);
@@ -181,6 +183,18 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
     [applyCustomerInfo]
   );
 
+  const syncIdentity = useCallback(async () => {
+    const { data, error } = await getSupabaseClient().auth.getUser();
+
+    if (error) throw error;
+    if (!data.user || data.user.is_anonymous) {
+      throw new Error("Sign in before starting a subscription.");
+    }
+
+    lastSyncedUserIdRef.current = data.user.id;
+    applyCustomerInfo(await logInPurchases(data.user.id));
+  }, [applyCustomerInfo]);
+
   const restore = useCallback(async () => {
     const outcome = await restorePremiumPurchases();
 
@@ -212,7 +226,8 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
       purchase,
       restore,
       redeemOfferCode,
-      refresh
+      refresh,
+      syncIdentity
     }),
     [
       isLoading,
@@ -222,7 +237,8 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
       redeemOfferCode,
       refresh,
       restore,
-      snapshot
+      snapshot,
+      syncIdentity
     ]
   );
 

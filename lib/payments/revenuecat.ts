@@ -242,9 +242,9 @@ export async function presentSubscriptionOfferCodeRedemption(): Promise<
 }
 
 /**
- * Whether the signed-in store account is still eligible for the 7-day
+ * Whether the signed-in store account is still eligible for the configured
  * introductory free trial. Apple grants intro offers once per subscription
- * group per Apple ID, so lapsed users must not be promised "7 days free".
+ * group per Apple ID, so lapsed users must not be promised a free trial.
  * Android reports eligibility through the offer itself, so default to true
  * there and let the store sheet show the final terms.
  */

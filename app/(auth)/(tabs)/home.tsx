@@ -17,7 +17,6 @@ import { EmptyPlants } from "@/components/illustrations/EmptyPlants";
 import { LineChart } from "@/components/illustrations/LineChart";
 import { ProgressRing } from "@/components/illustrations/ProgressRing";
 import { Sparkle } from "@/components/illustrations/Sparkle";
-import { PremiumLockedScreen } from "@/components/payments/PremiumLockedScreen";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -41,6 +40,7 @@ import {
 import { theme } from "@/constants/theme";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEntitlement } from "@/providers/EntitlementProvider";
+import { useOnboarding } from "@/providers/OnboardingProvider";
 import type { CareLogType, CareTaskType } from "@/types/careSchedule";
 import type { DashboardData, DashboardTask, ConsistencyWeek } from "@/types/dashboard";
 import type { PlantStatus, SavedPlant } from "@/types/plantCollection";
@@ -65,16 +65,35 @@ export default function HomeScreen() {
   const { isPremium } = useEntitlement();
 
   if (!isPremium) {
-    return (
-      <PremiumLockedScreen
-        title="Dashboard requires Premium"
-        message="Your care dashboard, reminders, weather tips, and ongoing plant utility are included with Premium. You can still scan one plant per day."
-        icon="home-variant-outline"
-      />
-    );
+    return <FreeDashboard />;
   }
 
   return <PremiumHomeScreen />;
+}
+
+function FreeDashboard() {
+  const onboarding = useOnboarding();
+
+  return (
+    <Screen contentContainerStyle={styles.freeDashboard}>
+      <Text style={styles.freeEyebrow}>Your Fernly dashboard</Text>
+      <Text style={styles.freeDashboardTitle}>
+        {onboarding.displayName ? `Welcome, ${onboarding.displayName}` : "Welcome to Fernly"}
+      </Text>
+      <Text style={styles.stateText}>
+        Take a clear plant photo to begin your first identification.
+      </Text>
+      <View style={styles.emptyIcon}>
+        <MaterialCommunityIcons color={theme.colors.leaf} name="camera-outline" size={40} />
+      </View>
+      <Button
+        gradient
+        icon="camera"
+        label="Take a plant photo"
+        onPress={() => router.push("/(auth)/(tabs)/scan" as never)}
+      />
+    </Screen>
+  );
 }
 
 function PremiumHomeScreen() {
@@ -755,6 +774,21 @@ function getStatusDisplay(status: PlantStatus): { label: string; tone: BadgeTone
 }
 
 const styles = StyleSheet.create({
+  freeDashboard: {
+    alignItems: "center",
+    flexGrow: 1,
+    justifyContent: "center"
+  },
+  freeDashboardTitle: {
+    ...theme.text.display,
+    marginBottom: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    textAlign: "center"
+  },
+  freeEyebrow: {
+    ...theme.text.eyebrow,
+    color: theme.colors.forest
+  },
   scrollContent: {
     paddingTop: theme.spacing.xl
   },

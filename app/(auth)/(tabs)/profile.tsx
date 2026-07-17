@@ -58,7 +58,7 @@ export default function ProfileScreen() {
     trialEligibilityByProductId: entitlement.trialEligibilityByProductId
   });
   const profilePremiumCtaLabel = hasProfileTrial
-    ? "Start 7-day free trial"
+    ? "Start 3-day free trial"
     : "Upgrade to Premium";
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);

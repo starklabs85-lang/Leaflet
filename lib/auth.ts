@@ -5,6 +5,13 @@ import { Platform } from "react-native";
 import { env, getGoogleConfigIssue, hasGoogleConfig } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
 
+type NativeIdTokenCredentials = {
+  provider: "apple" | "google";
+  token: string;
+  access_token?: string;
+  nonce?: string;
+};
+
 type GoogleSignInModule = typeof import("@react-native-google-signin/google-signin");
 type DeleteAccountResponse =
   | { ok: true }
@@ -105,15 +112,13 @@ export async function signInWithAppleIdToken() {
     throw new Error("Apple did not return an identity token. Please try again.");
   }
 
-  const { error } = await getSupabaseClient().auth.signInWithIdToken({
+  await linkOrSignInWithIdToken({
     provider: "apple",
     token: credential.identityToken,
     nonce: rawNonce
   });
 
-  if (error) {
-    throw error;
-  }
+  return { cancelled: false };
 }
 
 export async function signInWithGoogleIdToken() {
@@ -137,17 +142,35 @@ export async function signInWithGoogleIdToken() {
 
   const tokens = await GoogleSignin.getTokens();
 
-  const { error } = await getSupabaseClient().auth.signInWithIdToken({
+  await linkOrSignInWithIdToken({
     provider: "google",
     token: response.data.idToken,
     access_token: tokens.accessToken
   });
 
-  if (error) {
-    throw error;
+  return { cancelled: false };
+}
+
+async function linkOrSignInWithIdToken(credentials: NativeIdTokenCredentials) {
+  const supabase = getSupabaseClient();
+  const { data: current, error: currentError } = await supabase.auth.getUser();
+
+  if (currentError) throw currentError;
+
+  if (current.user?.is_anonymous) {
+    const { error: linkError } = await supabase.auth.linkIdentity(credentials);
+
+    if (!linkError) return;
+    if (!isExistingIdentityError(linkError)) throw linkError;
   }
 
-  return { cancelled: false };
+  const { error } = await supabase.auth.signInWithIdToken(credentials);
+  if (error) throw error;
+}
+
+function isExistingIdentityError(error: { code?: string; message: string }) {
+  const value = `${error.code ?? ""} ${error.message}`.toLowerCase();
+  return value.includes("identity_already_exists") || value.includes("already linked");
 }
 
 export async function signOutOfNativeProviders() {

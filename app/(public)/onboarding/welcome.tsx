@@ -8,12 +8,9 @@ import { BrandMark } from "@/components/illustrations/BrandMark";
 import { LeafDecor } from "@/components/illustrations/LeafDecor";
 import { PlantMascot } from "@/components/illustrations/PlantMascot";
 import { Button } from "@/components/ui/Button";
-import { PressableScale } from "@/components/ui/PressableScale";
 import { theme } from "@/constants/theme";
-import { useOnboarding } from "@/providers/OnboardingProvider";
 
 export default function OnboardingWelcomeScreen() {
-  const onboarding = useOnboarding();
   const insets = useSafeAreaInsets();
   const fade = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(28)).current;
@@ -34,25 +31,10 @@ export default function OnboardingWelcomeScreen() {
     ]).start();
   }, [fade, lift]);
 
-  async function skip() {
-    await onboarding.skip();
-    router.replace("/(public)/sign-in");
-  }
-
   const entrance = { opacity: fade, transform: [{ translateY: lift }] };
 
   return (
     <View style={styles.root}>
-      <PressableScale
-        accessibilityLabel="Skip onboarding and go to sign in"
-        accessibilityRole="button"
-        haptic={false}
-        onPress={skip}
-        style={[styles.skip, { top: insets.top + theme.spacing.xs }]}
-      >
-        <Text style={styles.skipText}>Skip</Text>
-      </PressableScale>
-
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -88,7 +70,6 @@ export default function OnboardingWelcomeScreen() {
 
           <View style={styles.dots}>
             <View style={[styles.dot, styles.dotActive]} />
-            <View style={styles.dot} />
           </View>
 
           <Button
@@ -97,7 +78,7 @@ export default function OnboardingWelcomeScreen() {
             icon="arrow-right"
             iconPosition="trailing"
             label="Get started"
-            onPress={() => router.push("/(public)/onboarding/intent" as never)}
+            onPress={() => router.push("/(public)/onboarding/name" as never)}
           />
         </Animated.View>
       </ScrollView>
@@ -109,20 +90,6 @@ const styles = StyleSheet.create({
   root: {
     backgroundColor: theme.colors.paper,
     flex: 1
-  },
-  skip: {
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: theme.spacing.md,
-    position: "absolute",
-    right: theme.spacing.lg,
-    zIndex: 2
-  },
-  skipText: {
-    color: theme.colors.forest,
-    fontFamily: theme.typography.fontFamily.bodyBold,
-    fontSize: theme.typography.body
   },
   content: {
     flexGrow: 1,

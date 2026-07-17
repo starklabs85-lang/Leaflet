@@ -33,6 +33,8 @@ import {
   useEntitlement
 } from "@/providers/EntitlementProvider";
 import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
+import { PendingScanProvider } from "@/providers/PendingScanProvider";
+import { getSupabaseClient } from "@/lib/supabase";
 
 // Keep the native splash visible until the brand fonts are ready so we never
 // flash system type. Errors here are non-fatal (we still fall back gracefully).
@@ -77,15 +79,37 @@ export default function RootLayout() {
       <AuthProvider>
         <EntitlementProvider>
           <OnboardingProvider>
-            <ConnectivityProvider>
-              <AnalyticsIdentitySync />
-              <AuthGate />
-            </ConnectivityProvider>
+            <PendingScanProvider>
+              <ConnectivityProvider>
+                <AnalyticsIdentitySync />
+                <ProfileNameSync />
+                <AuthGate />
+              </ConnectivityProvider>
+            </PendingScanProvider>
           </OnboardingProvider>
         </EntitlementProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
+}
+
+function ProfileNameSync() {
+  const auth = useAuth();
+  const onboarding = useOnboarding();
+
+  useEffect(() => {
+    if (
+      !auth.hasPermanentIdentity ||
+      !onboarding.displayName ||
+      auth.user?.user_metadata.display_name === onboarding.displayName
+    ) return;
+
+    getSupabaseClient().auth.updateUser({
+      data: { display_name: onboarding.displayName }
+    }).catch((error) => console.warn("Fernly display name sync failed", error));
+  }, [auth.hasPermanentIdentity, auth.user?.user_metadata.display_name, onboarding.displayName]);
+
+  return null;
 }
 
 function AnalyticsIdentitySync() {
@@ -197,9 +221,8 @@ function getPendingAuthRedirect(
 ) {
   const isPublicRoute = routeSegments[0] === "(public)";
   const isPublicLegalRoute = isPublicRoute && routeSegments[1] === "legal";
+  const isPublicOnboardingRoute = isPublicRoute && routeSegments[1] === "onboarding";
   const isAuthenticated = authStatus === "authenticated";
-  const isAuthOnboardingRoute =
-    routeSegments[0] === "(auth)" && routeSegments[1] === "onboarding";
   const isOnboardingScanRoute =
     routeSegments[0] === "(auth)" &&
     routeSegments[1] === "(tabs)" &&
@@ -216,13 +239,14 @@ function getPendingAuthRedirect(
   if (
     isAuthenticated &&
     onboardingStatus === "needs_onboarding" &&
-    (isPublicRoute ||
-      (!isAuthOnboardingRoute && !isOnboardingScanRoute && !isOnboardingPremiumRoute))
+    !isPublicOnboardingRoute &&
+    !isOnboardingScanRoute &&
+    !isOnboardingPremiumRoute
   ) {
-    return "/(auth)/onboarding/first-scan";
+    return "/(public)/onboarding/welcome";
   }
 
-  if (isAuthenticated && isPublicRoute && !isPublicLegalRoute) {
+  if (isAuthenticated && isPublicRoute && !isPublicLegalRoute && !isPublicOnboardingRoute) {
     return "/(auth)/(tabs)/home";
   }
 

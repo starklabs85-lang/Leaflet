@@ -40,6 +40,7 @@ import {
 } from "@/lib/payments/limits";
 import { useEntitlement } from "@/providers/EntitlementProvider";
 import { useOnboarding } from "@/providers/OnboardingProvider";
+import { usePendingScan, type PendingScanPhoto } from "@/providers/PendingScanProvider";
 import type {
   IdentifyPlantResult,
   PlantIdentificationCandidate,
@@ -62,9 +63,11 @@ export default function ScanScreen() {
   const params = useLocalSearchParams<{
     mode?: string | string[];
     plantId?: string | string[];
+    resumePending?: string | string[];
   }>();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
+  const hasResumedPendingRef = useRef(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [mode, setMode] = useState<ScanMode>(getInitialMode(params.mode));
   const [sourcePlantId, setSourcePlantId] = useState<string | null>(
@@ -83,6 +86,7 @@ export default function ScanScreen() {
     useState(false);
   const { isPremium } = useEntitlement();
   const onboarding = useOnboarding();
+  const pendingScan = usePendingScan();
 
   useEffect(() => {
     const nextMode = getInitialMode(params.mode);
@@ -91,6 +95,26 @@ export default function ScanScreen() {
     setMode(nextMode);
     setSourcePlantId(nextPlantId);
   }, [params.mode, params.plantId]);
+
+  useEffect(() => {
+    if (
+      hasResumedPendingRef.current ||
+      !isPremium ||
+      getStringParam(params.resumePending) !== "1"
+    ) return;
+
+    hasResumedPendingRef.current = true;
+    const pending = pendingScan.consume();
+
+    if (!pending) {
+      setErrorMessage("The captured photo is no longer available. Please take it again.");
+      setStep("camera");
+      return;
+    }
+
+    setPhoto(pending);
+    void submitPhoto(pending);
+  }, [isPremium, params.resumePending, pendingScan]);
 
   const visibleResult = useMemo(() => {
     if (!result?.isPlant) {
@@ -231,8 +255,22 @@ export default function ScanScreen() {
     setStep("preview");
   }
 
-  async function submitPhoto() {
-    if (!photo) {
+  async function submitPhoto(photoOverride?: PendingScanPhoto) {
+    const submittedPhoto = photoOverride ?? photo;
+
+    if (!submittedPhoto) {
+      return;
+    }
+
+    if (mode === "identify" && !isPremium) {
+      pendingScan.preserve(submittedPhoto);
+      void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
+        source: "captured_photo"
+      });
+      router.push({
+        pathname: "/(auth)/premium" as never,
+        params: { source: "captured_photo" }
+      });
       return;
     }
 
@@ -246,7 +284,7 @@ export default function ScanScreen() {
     void trackAction(ANALYTICS_EVENTS.SCAN_SUBMIT, {
       has_plant_context: Boolean(sourcePlantId),
       mode,
-      photo_source: photo.source
+      photo_source: submittedPhoto.source
     });
 
     // Friendly pre-check; the identify-plant function enforces the same caps
@@ -268,7 +306,7 @@ export default function ScanScreen() {
     }
 
     try {
-      const compressed = await compressPhoto(photo);
+      const compressed = await compressPhoto(submittedPhoto);
 
       if (mode === "identify") {
         const response = await identifyPlant({

@@ -1,17 +1,34 @@
 import { StyleSheet, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
 import { PremiumContent } from "@/components/payments/PremiumContent";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { Screen } from "@/components/ui/Screen";
 import { theme } from "@/constants/theme";
+import { usePendingScan } from "@/providers/PendingScanProvider";
 
 /**
  * The premium/upgrade screen (Phase 13 §6). Reached only from Profile and
  * inline limit prompts — never a popup or launch interstitial.
  */
 export default function PremiumScreen() {
+  const params = useLocalSearchParams<{ source?: string | string[] }>();
+  const pendingScan = usePendingScan();
+  const source = Array.isArray(params.source) ? params.source[0] : params.source;
+
+  function continueAfterPurchase() {
+    if (source === "captured_photo" && pendingScan.photo) {
+      router.replace({
+        pathname: "/(auth)/(tabs)/scan" as never,
+        params: { resumePending: "1" }
+      });
+      return;
+    }
+
+    router.replace("/(auth)/(tabs)/home" as never);
+  }
+
   return (
     <Screen>
       <PressableScale
@@ -37,7 +54,7 @@ export default function PremiumScreen() {
         photos.
       </Text>
 
-      <PremiumContent />
+      <PremiumContent onPurchased={continueAfterPurchase} source={source ?? "premium_screen"} />
     </Screen>
   );
 }

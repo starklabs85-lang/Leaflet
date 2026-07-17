@@ -1,5 +1,9 @@
 project_id = "gnrjqqoidzuwzvhhfggh"
 
+[auth]
+enable_anonymous_sign_ins = true
+enable_manual_linking = true
+
 [functions.identify-plant]
 verify_jwt = true
 

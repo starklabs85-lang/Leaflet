@@ -34,8 +34,11 @@ type AuthContextValue = {
   errorMessage: string | null;
   activeProvider: AuthProviderName | null;
   isLoading: boolean;
-  signInWithApple: () => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  isAnonymous: boolean;
+  hasPermanentIdentity: boolean;
+  ensureAnonymousSession: () => Promise<void>;
+  signInWithApple: () => Promise<boolean>;
+  signInWithGoogle: () => Promise<boolean>;
   deleteAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -108,7 +111,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
         if (isCancelledAuthOutcome(result)) {
           void trackAction(ANALYTICS_EVENTS.SIGN_IN_CANCEL, { provider });
-          return result;
+          return false;
         }
 
         void trackAction(ANALYTICS_EVENTS.SIGN_IN_RESULT, {
@@ -116,7 +119,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           result: "success"
         });
 
-        return result;
+        return true;
       } catch (error) {
         if (isUserCancelledAuthError(error)) {
           void trackAction(ANALYTICS_EVENTS.SIGN_IN_CANCEL, { provider });
@@ -134,13 +137,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
           });
           setErrorMessage(message);
         }
-        return undefined;
+        return false;
       } finally {
         setActiveProvider(null);
       }
     },
     []
   );
+
+  const ensureAnonymousSession = useCallback(async () => {
+    if (!hasSupabaseConfig()) {
+      throw new Error(getSupabaseConfigIssue() ?? "Supabase is not configured.");
+    }
+
+    const supabase = getSupabaseClient();
+    const { data: current, error: currentError } = await supabase.auth.getSession();
+
+    if (currentError) throw currentError;
+    if (current.session) return;
+
+    const { data, error } = await supabase.auth.signInAnonymously();
+
+    if (error || !data.session) {
+      throw error ?? new Error("Fernly could not start a private session.");
+    }
+
+    setSession(data.session);
+    setStatus("authenticated");
+  }, []);
 
   const signInWithApple = useCallback(
     () => runAuthAction("apple", signInWithAppleIdToken),
@@ -236,6 +260,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       errorMessage,
       activeProvider,
       isLoading: status === "loading" || activeProvider !== null,
+      isAnonymous: session?.user.is_anonymous === true,
+      hasPermanentIdentity:
+        status === "authenticated" && session?.user.is_anonymous !== true,
+      ensureAnonymousSession,
       signInWithApple,
       signInWithGoogle,
       deleteAccount,
@@ -247,6 +275,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       clearError,
       deleteAccount,
       errorMessage,
+      ensureAnonymousSession,
       session,
       signInWithApple,
       signInWithGoogle,
