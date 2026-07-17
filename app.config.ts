@@ -10,7 +10,7 @@ const config: ExpoConfig = {
   name: "Fernly",
   slug: "leaflet",
   scheme: "leaflet",
-  version: "1.0",
+  version: "1.0.1",
   orientation: "portrait",
   userInterfaceStyle: "light",
   newArchEnabled: true,
