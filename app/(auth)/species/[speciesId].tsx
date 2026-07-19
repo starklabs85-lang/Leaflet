@@ -53,7 +53,7 @@ export default function SpeciesInfoScreen() {
     return (
       <PremiumLockedScreen
         title="Care info requires Premium"
-        message="Detailed species profiles and care guidance are included with Premium. Your free tier still includes one plant identification scan per day."
+        message="Plant identification, detailed species profiles, and care guidance are included with Premium."
         icon="book-open-variant"
       />
     );

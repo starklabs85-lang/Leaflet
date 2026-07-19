@@ -46,7 +46,7 @@ export default function TodayTaskChecklistScreen() {
     return (
       <PremiumLockedScreen
         title="Today's tasks require Premium"
-        message="Daily care checklists, reminders, and plant schedules are included with Premium. You can still scan one plant per day."
+        message="Daily care checklists, reminders, plant schedules, and plant identification are included with Premium."
         icon="calendar-check-outline"
       />
     );

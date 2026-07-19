@@ -1,14 +1,11 @@
 import { getSupabaseClient } from "@/lib/supabase";
+import { getIdentificationAccess } from "@/lib/payments/identificationAccess";
 
 /**
- * Free-tier product limits. The identify cap is enforced server-side in the
- * identify-plant edge function (which reads the `subscriptions` table); these
- * client checks exist so users see a friendly inline prompt before a request
- * is wasted. Other product features are Premium-only at their entry points.
+ * Client-side Premium checks provide a friendly prompt before a request is
+ * wasted. The identify-plant Edge Function independently enforces the same
+ * entitlement requirement.
  */
-export const FREE_LIMITS = {
-  identifyScansPerDay: 1
-} as const;
 
 export type LimitCheck =
   | { allowed: true; remaining: number | null }
@@ -19,28 +16,7 @@ const UNLIMITED: LimitCheck = { allowed: true, remaining: null };
 export async function checkIdentifyScanAllowance(
   isPremium: boolean
 ): Promise<LimitCheck> {
-  if (isPremium) {
-    return UNLIMITED;
-  }
-
-  const usage = await getDailyScanUsage();
-
-  // Pre-check only — fail open and let the server enforce.
-  if (!usage) {
-    return { allowed: true, remaining: null };
-  }
-
-  const remaining = FREE_LIMITS.identifyScansPerDay - usage.identifyCount;
-
-  if (remaining <= 0) {
-    return {
-      allowed: false,
-      remaining: 0,
-      message: "You've used your free plant scan today. Upgrade to Premium for unlimited scans."
-    };
-  }
-
-  return { allowed: true, remaining };
+  return getIdentificationAccess(isPremium);
 }
 
 export async function checkDiagnoseScanAllowance(
@@ -99,17 +75,4 @@ export async function getCollectionCount() {
   }
 
   return count;
-}
-
-async function getDailyScanUsage() {
-  const { data, error } = await getSupabaseClient().rpc("get_daily_scan_usage");
-
-  if (error || !data?.[0]) {
-    return null;
-  }
-
-  return {
-    identifyCount: Number(data[0].identify_count ?? 0),
-    diagnoseCount: Number(data[0].diagnose_count ?? 0)
-  };
 }

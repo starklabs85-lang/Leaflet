@@ -28,6 +28,7 @@ import { Screen } from "@/components/ui/Screen";
 import { TodayNearYou } from "@/components/weather/TodayNearYou";
 import { fetchDashboardData } from "@/lib/api/dashboard";
 import { formatCareType, quickLogCare } from "@/lib/api/careSchedule";
+import { getGreeting } from "@/lib/greeting";
 import {
   ANALYTICS_EVENTS,
   trackAction
@@ -40,7 +41,6 @@ import {
 import { theme } from "@/constants/theme";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEntitlement } from "@/providers/EntitlementProvider";
-import { useOnboarding } from "@/providers/OnboardingProvider";
 import type { CareLogType, CareTaskType } from "@/types/careSchedule";
 import type { DashboardData, DashboardTask, ConsistencyWeek } from "@/types/dashboard";
 import type { PlantStatus, SavedPlant } from "@/types/plantCollection";
@@ -72,16 +72,14 @@ export default function HomeScreen() {
 }
 
 function FreeDashboard() {
-  const onboarding = useOnboarding();
-
   return (
     <Screen contentContainerStyle={styles.freeDashboard}>
       <Text style={styles.freeEyebrow}>Your Fernly dashboard</Text>
       <Text style={styles.freeDashboardTitle}>
-        {onboarding.displayName ? `Welcome, ${onboarding.displayName}` : "Welcome to Fernly"}
+        Welcome to Fernly
       </Text>
       <Text style={styles.stateText}>
-        Take a clear plant photo to begin your first identification.
+        Take a clear plant photo, then choose a Premium plan to identify it.
       </Text>
       <View style={styles.emptyIcon}>
         <MaterialCommunityIcons color={theme.colors.leaf} name="camera-outline" size={40} />
@@ -692,20 +690,6 @@ function openPlant(plantId: string) {
     pathname: "/(auth)/plants/[plantId]" as never,
     params: { plantId }
   });
-}
-
-function getGreeting() {
-  const hour = new Date().getHours();
-
-  if (hour < 12) {
-    return "Good morning";
-  }
-
-  if (hour < 17) {
-    return "Good afternoon";
-  }
-
-  return "Good evening";
 }
 
 function formatToday() {

@@ -2,15 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getWelcomeOnboardingCompletionMethod,
   getOnboardingEntryRoute,
-  normalizeDisplayName,
   requiresPermanentIdentity
 } from "./flow.js";
 
-test("normalizes a required display name", () => {
-  assert.equal(normalizeDisplayName("  Arnab   Roy  "), "Arnab Roy");
-  assert.equal(normalizeDisplayName("   "), null);
-  assert.equal(normalizeDisplayName("a".repeat(81)), null);
+test("marks welcome as the no-name onboarding completion method", () => {
+  assert.equal(getWelcomeOnboardingCompletionMethod(), "welcome");
 });
 
 test("routes incomplete users to welcome and completed users to home", () => {

@@ -43,6 +43,7 @@ import {
   isWeatherAlertsEnabled,
   setWeatherAlertsEnabled
 } from "@/lib/notifications/weatherAlerts";
+import { getGreeting } from "@/lib/greeting";
 import { isProfileTrialEligible } from "@/lib/payments/profileTrialCta";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEntitlement } from "@/providers/EntitlementProvider";
@@ -241,7 +242,7 @@ export default function ProfileScreen() {
   return (
     <Screen
       contentContainerStyle={styles.content}
-      header={<ProfileHeader user={auth.user} />}
+      header={<ProfileHeader isAnonymous={auth.isAnonymous} user={auth.user} />}
     >
       <Text style={styles.sectionLabel}>Membership</Text>
       <Card padded={false} style={styles.card}>
@@ -455,7 +456,21 @@ export default function ProfileScreen() {
   );
 }
 
-function ProfileHeader({ user }: { user: User | null }) {
+function ProfileHeader({
+  isAnonymous,
+  user
+}: {
+  isAnonymous: boolean;
+  user: User | null;
+}) {
+  if (isAnonymous) {
+    return (
+      <GradientHeader>
+        <Text style={styles.headerName}>{getGreeting()}</Text>
+      </GradientHeader>
+    );
+  }
+
   const name = getDisplayName(user);
   const email = user?.email ?? "Signed-in user";
   const initial = getInitial(name, email);

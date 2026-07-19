@@ -34,7 +34,6 @@ import {
 } from "@/providers/EntitlementProvider";
 import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
 import { PendingScanProvider } from "@/providers/PendingScanProvider";
-import { getSupabaseClient } from "@/lib/supabase";
 
 // Keep the native splash visible until the brand fonts are ready so we never
 // flash system type. Errors here are non-fatal (we still fall back gracefully).
@@ -82,7 +81,6 @@ export default function RootLayout() {
             <PendingScanProvider>
               <ConnectivityProvider>
                 <AnalyticsIdentitySync />
-                <ProfileNameSync />
                 <AuthGate />
               </ConnectivityProvider>
             </PendingScanProvider>
@@ -91,25 +89,6 @@ export default function RootLayout() {
       </AuthProvider>
     </SafeAreaProvider>
   );
-}
-
-function ProfileNameSync() {
-  const auth = useAuth();
-  const onboarding = useOnboarding();
-
-  useEffect(() => {
-    if (
-      !auth.hasPermanentIdentity ||
-      !onboarding.displayName ||
-      auth.user?.user_metadata.display_name === onboarding.displayName
-    ) return;
-
-    getSupabaseClient().auth.updateUser({
-      data: { display_name: onboarding.displayName }
-    }).catch((error) => console.warn("Fernly display name sync failed", error));
-  }, [auth.hasPermanentIdentity, auth.user?.user_metadata.display_name, onboarding.displayName]);
-
-  return null;
 }
 
 function AnalyticsIdentitySync() {

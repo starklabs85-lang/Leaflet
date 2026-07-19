@@ -39,7 +39,6 @@ import {
   checkIdentifyScanAllowance
 } from "@/lib/payments/limits";
 import { useEntitlement } from "@/providers/EntitlementProvider";
-import { useOnboarding } from "@/providers/OnboardingProvider";
 import { usePendingScan, type PendingScanPhoto } from "@/providers/PendingScanProvider";
 import type {
   IdentifyPlantResult,
@@ -82,10 +81,7 @@ export default function ScanScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [limitTitle, setLimitTitle] = useState<string | null>(null);
-  const [showOnboardingPremiumPrompt, setShowOnboardingPremiumPrompt] =
-    useState(false);
   const { isPremium } = useEntitlement();
-  const onboarding = useOnboarding();
   const pendingScan = usePendingScan();
 
   useEffect(() => {
@@ -280,7 +276,6 @@ export default function ScanScreen() {
     setLimitTitle(null);
     setResult(null);
     setSelectedAlternateIndex(null);
-    setShowOnboardingPremiumPrompt(false);
     void trackAction(ANALYTICS_EVENTS.SCAN_SUBMIT, {
       has_plant_context: Boolean(sourcePlantId),
       mode,
@@ -360,9 +355,6 @@ export default function ScanScreen() {
           result: "success"
         });
         setResult(response.data.result);
-        if (!isPremium && onboarding.status === "needs_onboarding") {
-          setShowOnboardingPremiumPrompt(true);
-        }
         setStep("result");
         return;
       }
@@ -456,37 +448,7 @@ export default function ScanScreen() {
     setErrorMessage(null);
     setLimitMessage(null);
     setLimitTitle(null);
-    setShowOnboardingPremiumPrompt(false);
     setStep("camera");
-  }
-
-  async function completeFreeScanOnboarding() {
-    try {
-      await onboarding.completeAfterFreeScan();
-    } catch (error) {
-      console.warn("Fernly onboarding completion after free scan failed", error);
-    }
-  }
-
-  async function continueAfterFreeScan() {
-    setShowOnboardingPremiumPrompt(false);
-    await completeFreeScanOnboarding();
-    router.replace("/(auth)/(tabs)/home" as never);
-  }
-
-  async function upgradeAfterFreeScan() {
-    setShowOnboardingPremiumPrompt(false);
-    await completeFreeScanOnboarding();
-    void trackAction(ANALYTICS_EVENTS.PREMIUM_CTA, {
-      source: "onboarding_scan_result"
-    });
-    router.push("/(auth)/premium" as never);
-  }
-
-  async function scanAgainAfterFreeScan() {
-    setShowOnboardingPremiumPrompt(false);
-    await completeFreeScanOnboarding();
-    resetScan();
   }
 
   const copy = getModeCopy(mode, Boolean(sourcePlantId));
@@ -495,7 +457,7 @@ export default function ScanScreen() {
     return (
       <PremiumLockedScreen
         title="Diagnosis requires Premium"
-        message="Identify remains available once per day. Premium unlocks disease and pest diagnosis before any photo is uploaded."
+        message="Plant identification and disease or pest diagnosis require Premium. Start a trial or subscribe before any photo is uploaded."
         secondaryLabel="Identify instead"
         onSecondaryPress={() => {
           void trackAction(ANALYTICS_EVENTS.SCAN_MODE_CHANGE, {
@@ -571,7 +533,7 @@ export default function ScanScreen() {
               title={limitTitle ?? undefined}
               message={
                 limitMessage ??
-                "You've reached today's free scan limit. Upgrade to Premium for unlimited scans."
+                "Start a trial or subscribe to Premium to continue scanning."
               }
               onDismiss={resetScan}
             />
@@ -610,25 +572,8 @@ export default function ScanScreen() {
               result={visibleResult}
               selectedAlternateIndex={selectedAlternateIndex}
               onSelectAlternate={setSelectedAlternateIndex}
-              onPremiumAction={
-                showOnboardingPremiumPrompt ? upgradeAfterFreeScan : undefined
-              }
-              onScanAgain={
-                showOnboardingPremiumPrompt ? scanAgainAfterFreeScan : resetScan
-              }
+              onScanAgain={resetScan}
             />
-          ) : null}
-          {showOnboardingPremiumPrompt ? (
-            <View style={styles.resultPanel}>
-            <UpgradePrompt
-              analyticsSource="onboarding_scan_result"
-              title="Unlock the rest of Fernly"
-              message="Your first identification result is ready. Premium unlocks saving this plant, care info, diagnosis, reminders, weather tips, and growth photos."
-                dismissLabel="Continue with free"
-                onDismiss={continueAfterFreeScan}
-                onUpgrade={upgradeAfterFreeScan}
-              />
-            </View>
           ) : null}
         </ScrollView>
       </SafeAreaView>
@@ -793,7 +738,6 @@ function ModeButton({
 
 function PlantResult({
   isPremium,
-  onPremiumAction,
   result,
   selectedAlternateIndex,
   onSelectAlternate,
@@ -804,7 +748,6 @@ function PlantResult({
   result: PlantIdentificationResult;
   selectedAlternateIndex: number | null;
   onSelectAlternate: (index: number | null) => void;
-  onPremiumAction?: () => void;
   onScanAgain: () => void;
   sourcePhotoUri: string;
 }) {
@@ -816,11 +759,6 @@ function PlantResult({
       reason,
       source: "scan_result"
     });
-
-    if (onPremiumAction) {
-      onPremiumAction();
-      return;
-    }
 
     router.push("/(auth)/premium" as never);
   }

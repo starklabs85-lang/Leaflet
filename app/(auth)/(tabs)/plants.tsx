@@ -35,7 +35,7 @@ export default function PlantsScreen() {
     return (
       <PremiumLockedScreen
         title="Collection requires Premium"
-        message="Saving plants, collection actions, care schedules, and growth history are included with Premium. You can still scan one plant per day."
+        message="Plant identification, saved plants, collection actions, care schedules, and growth history are included with Premium."
         icon="sprout-outline"
       />
     );

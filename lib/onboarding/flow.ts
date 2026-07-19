@@ -3,12 +3,8 @@ export type PersistedOnboardingStatus =
   | "skipped"
   | "complete";
 
-export function normalizeDisplayName(value: string) {
-  const normalized = value.trim().replace(/\s+/g, " ");
-
-  return normalized.length >= 2 && normalized.length <= 80
-    ? normalized
-    : null;
+export function getWelcomeOnboardingCompletionMethod() {
+  return "welcome";
 }
 
 export function getOnboardingEntryRoute(status: PersistedOnboardingStatus) {

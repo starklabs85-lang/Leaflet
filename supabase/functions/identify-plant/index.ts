@@ -1,8 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getScanAccess, type ScanType } from "./access.ts";
 
-type ScanType = "identify" | "diagnose";
 type Difficulty = "easy" | "moderate" | "hard";
 type DiagnosisCategory =
   | "disease"
@@ -112,12 +112,9 @@ type PlantDiagnosisResult = {
 };
 
 const MAX_IMAGE_BASE64_LENGTH = 12_000_000;
-const MAX_SCANS_PER_HOUR = 10;
 // Premium is "unlimited" product-wise; this is purely an anti-abuse backstop
 // (each scan costs an OpenAI call).
 const MAX_PREMIUM_SCANS_PER_HOUR = 30;
-// Free identify scans are counted over the current UTC day.
-const FREE_IDENTIFY_SCANS_PER_DAY = 1;
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o";
 
 const corsHeaders = {
@@ -725,8 +722,27 @@ Deno.serve(async (req) => {
     );
   }
 
-  const imageHash = await sha256(validation.value.imageBase64);
   const isPremium = await getIsPremium(adminClient, user.id);
+  const access = getScanAccess({
+    isPremium,
+    scanType: validation.value.scanType
+  });
+
+  if (!access.allowed) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: access.code,
+          message: access.message,
+          scanType: validation.value.scanType
+        }
+      },
+      402
+    );
+  }
+
+  const imageHash = await sha256(validation.value.imageBase64);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
   const { count } = await adminClient
@@ -735,9 +751,7 @@ Deno.serve(async (req) => {
     .eq("user_id", user.id)
     .gte("created_at", oneHourAgo);
 
-  const hourlyCap = isPremium ? MAX_PREMIUM_SCANS_PER_HOUR : MAX_SCANS_PER_HOUR;
-
-  if ((count ?? 0) >= hourlyCap) {
+  if ((count ?? 0) >= MAX_PREMIUM_SCANS_PER_HOUR) {
     return jsonResponse(
       {
         ok: false,
@@ -749,48 +763,6 @@ Deno.serve(async (req) => {
       },
       429
     );
-  }
-
-  if (!isPremium) {
-    if (validation.value.scanType === "diagnose") {
-      return jsonResponse(
-        {
-          ok: false,
-          error: {
-            code: "premium_required",
-            message: "Disease diagnosis is included with Premium.",
-            scanType: validation.value.scanType
-          }
-        },
-        402
-      );
-    }
-
-    const dailyLimit = FREE_IDENTIFY_SCANS_PER_DAY;
-    const utcDayStart = new Date();
-    utcDayStart.setUTCHours(0, 0, 0, 0);
-
-    const { count: dailyCount } = await adminClient
-      .from("scan_events")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("scan_type", validation.value.scanType)
-      .gte("created_at", utcDayStart.toISOString());
-
-    if ((dailyCount ?? 0) >= dailyLimit) {
-      return jsonResponse(
-        {
-          ok: false,
-          error: {
-            code: "free_limit_reached",
-            message: `You've used your ${dailyLimit} free plant scan today. Upgrade to Premium for unlimited scans.`,
-            scanType: validation.value.scanType,
-            limit: dailyLimit
-          }
-        },
-        429
-      );
-    }
   }
 
   const { data: cached } = await adminClient

@@ -14,7 +14,8 @@ import {
   ANALYTICS_TAPS,
   trackAction
 } from "@/lib/analytics/firebaseAnalytics";
-import { FREE_LIMITS } from "@/lib/payments/limits";
+import { IDENTIFICATION_COMPARISON_ROW } from "@/lib/payments/paywallCopy";
+import { shouldContinueAfterPremiumOutcome } from "@/lib/payments/serverEntitlement";
 import { requiresPermanentIdentity } from "@/lib/onboarding/flow";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEntitlement } from "@/providers/EntitlementProvider";
@@ -39,9 +40,9 @@ function iconCell(included: boolean): ComparisonCell {
 
 const COMPARISON_ROWS: ComparisonRow[] = [
   {
-    feature: "Plant identification",
-    free: textCell(`${FREE_LIMITS.identifyScansPerDay}/day`),
-    premium: textCell("Unlimited")
+    feature: IDENTIFICATION_COMPARISON_ROW.feature,
+    free: iconCell(IDENTIFICATION_COMPARISON_ROW.freeIncluded),
+    premium: textCell(IDENTIFICATION_COMPARISON_ROW.premiumLabel)
   },
   {
     feature: "Disease diagnosis",
@@ -101,10 +102,12 @@ export function PremiumContent({
     purchase,
     restore,
     redeemOfferCode,
-    syncIdentity
+    syncIdentity,
+    waitForServerPremium
   } = useEntitlement();
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">("annual");
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isContinuing, setIsContinuing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isRedeemingCode, setIsRedeemingCode] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -128,6 +131,22 @@ export function PremiumContent({
     });
   }, [isPremium, source]);
 
+  async function continueAfterServerSync(successMessage: string) {
+    setIsContinuing(true);
+    const serverReady = await waitForServerPremium();
+    setIsContinuing(false);
+
+    if (!serverReady) {
+      setFeedback(
+        "Premium is active. Fernly is still syncing your account. Tap continue in a moment."
+      );
+      return;
+    }
+
+    setFeedback(successMessage);
+    onPurchased?.();
+  }
+
   async function performPurchase() {
     if (!selectedPackage || isPurchasing) {
       return;
@@ -150,9 +169,8 @@ export function PremiumContent({
       source
     });
 
-    if (outcome.status === "purchased") {
-      setFeedback("Welcome to Premium! Everything is unlocked.");
-      onPurchased?.();
+    if (shouldContinueAfterPremiumOutcome(outcome.status)) {
+      await continueAfterServerSync("Welcome to Premium! Everything is unlocked.");
       return;
     }
 
@@ -212,8 +230,8 @@ export function PremiumContent({
       source
     });
 
-    if (outcome.status === "restored") {
-      setFeedback("Your Premium subscription has been restored.");
+    if (shouldContinueAfterPremiumOutcome(outcome.status)) {
+      await continueAfterServerSync("Your Premium subscription has been restored.");
       return;
     }
 
@@ -222,7 +240,9 @@ export function PremiumContent({
       return;
     }
 
-    setFeedback(outcome.message);
+    if (outcome.status === "error") {
+      setFeedback(outcome.message);
+    }
   }
 
   async function handleRedeemOfferCode() {
@@ -272,6 +292,24 @@ export function PremiumContent({
         <Text style={styles.manageHint}>
           Manage or cancel anytime in your app store subscription settings.
         </Text>
+        {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+        {onPurchased ? (
+          <Button
+            disabled={isContinuing}
+            gradient
+            icon="arrow-right"
+            iconPosition="trailing"
+            label={
+              source === "captured_photo"
+                ? "Continue identification"
+                : "Continue to Fernly"
+            }
+            loading={isContinuing}
+            onPress={() =>
+              void continueAfterServerSync("Premium is ready.")
+            }
+          />
+        ) : null}
       </View>
     );
   }

@@ -13,9 +13,7 @@ import {
   ANALYTICS_EVENTS,
   trackAction
 } from "@/lib/analytics/firebaseAnalytics";
-import { normalizeDisplayName } from "@/lib/onboarding/flow";
-
-export type OnboardingIntent = "new_plant_parent" | "growing_collector";
+import { getWelcomeOnboardingCompletionMethod } from "@/lib/onboarding/flow";
 
 export type OnboardingActivationContext = {
   completedAt: string;
@@ -28,17 +26,13 @@ export type OnboardingStatus = "loading" | "needs_onboarding" | "skipped" | "com
 
 type OnboardingContextValue = {
   activationContext: OnboardingActivationContext | null;
-  completeWithDisplayName: (displayName: string) => Promise<void>;
-  completeAfterFreeScan: () => Promise<void>;
+  completeFromWelcome: () => Promise<void>;
   completeAfterPlantSave: (
     context: Omit<OnboardingActivationContext, "completedAt">
   ) => Promise<boolean>;
-  intent: OnboardingIntent | null;
-  displayName: string | null;
   isComplete: boolean;
   isLoading: boolean;
   refresh: () => Promise<void>;
-  setIntent: (intent: OnboardingIntent) => Promise<void>;
   skip: () => Promise<void>;
   status: OnboardingStatus;
 };
@@ -46,16 +40,12 @@ type OnboardingContextValue = {
 const ONBOARDING_COMPLETE_KEY = "onboarding_complete";
 // SecureStore rejects ":" in keys, so namespaces use "." (alphanumeric, ".", "-", "_" only).
 const ONBOARDING_SKIPPED_KEY = "leaflet.onboarding_skipped";
-const ONBOARDING_INTENT_KEY = "leaflet.onboarding_intent";
 const ONBOARDING_ACTIVATION_KEY = "leaflet.onboarding_activation";
-const ONBOARDING_DISPLAY_NAME_KEY = "leaflet.onboarding_display_name";
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
 export function OnboardingProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<OnboardingStatus>("loading");
-  const [intent, setStoredIntent] = useState<OnboardingIntent | null>(null);
-  const [displayName, setDisplayName] = useState<string | null>(null);
   const [activationContext, setActivationContext] =
     useState<OnboardingActivationContext | null>(null);
 
@@ -63,17 +53,17 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     setStatus("loading");
 
     try {
-      const [complete, skipped, storedIntent, activation, storedDisplayName] = await Promise.all([
+      const [complete, skipped, activation] = await Promise.all([
         secureStorageAdapter.getItem(ONBOARDING_COMPLETE_KEY),
         secureStorageAdapter.getItem(ONBOARDING_SKIPPED_KEY),
-        secureStorageAdapter.getItem(ONBOARDING_INTENT_KEY),
-        secureStorageAdapter.getItem(ONBOARDING_ACTIVATION_KEY),
-        secureStorageAdapter.getItem(ONBOARDING_DISPLAY_NAME_KEY)
+        secureStorageAdapter.getItem(ONBOARDING_ACTIVATION_KEY)
       ]);
 
-      setStoredIntent(isOnboardingIntent(storedIntent) ? storedIntent : null);
+      await Promise.all([
+        secureStorageAdapter.removeItem("leaflet.onboarding_intent"),
+        secureStorageAdapter.removeItem("leaflet.onboarding_display_name")
+      ]).catch(() => undefined);
       setActivationContext(parseActivationContext(activation));
-      setDisplayName(normalizeDisplayName(storedDisplayName ?? ""));
 
       if (complete === "true") {
         setStatus("complete");
@@ -84,8 +74,6 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       }
     } catch {
       setStatus("needs_onboarding");
-      setStoredIntent(null);
-      setDisplayName(null);
       setActivationContext(null);
     }
   }, []);
@@ -94,32 +82,16 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     refresh();
   }, [refresh]);
 
-  const setIntent = useCallback(async (nextIntent: OnboardingIntent) => {
-    setStoredIntent(nextIntent);
-    await secureStorageAdapter.setItem(ONBOARDING_INTENT_KEY, nextIntent);
-    void trackAction(ANALYTICS_EVENTS.ONBOARDING_INTENT_SELECT, {
-      intent: nextIntent
-    });
-  }, []);
-
-  const completeWithDisplayName = useCallback(async (value: string) => {
-    const normalized = normalizeDisplayName(value);
-
-    if (!normalized) {
-      throw new Error("Enter a name between 2 and 80 characters.");
-    }
-
+  const completeFromWelcome = useCallback(async () => {
     await Promise.all([
-      secureStorageAdapter.setItem(ONBOARDING_DISPLAY_NAME_KEY, normalized),
       secureStorageAdapter.setItem(ONBOARDING_COMPLETE_KEY, "true"),
       secureStorageAdapter.removeItem(ONBOARDING_SKIPPED_KEY),
       secureStorageAdapter.removeItem(ONBOARDING_ACTIVATION_KEY)
     ]);
-    setDisplayName(normalized);
     setActivationContext(null);
     setStatus("complete");
     void trackAction(ANALYTICS_EVENTS.ONBOARDING_COMPLETE, {
-      method: "display_name"
+      method: getWelcomeOnboardingCompletionMethod()
     });
   }, []);
 
@@ -159,44 +131,22 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     [status]
   );
 
-  const completeAfterFreeScan = useCallback(async () => {
-    await Promise.all([
-      secureStorageAdapter.setItem(ONBOARDING_COMPLETE_KEY, "true"),
-      secureStorageAdapter.removeItem(ONBOARDING_SKIPPED_KEY),
-      secureStorageAdapter.removeItem(ONBOARDING_ACTIVATION_KEY)
-    ]);
-
-    setActivationContext(null);
-    setStatus("complete");
-    void trackAction(ANALYTICS_EVENTS.ONBOARDING_COMPLETE, {
-      method: "free_scan"
-    });
-  }, []);
-
   const value = useMemo<OnboardingContextValue>(
     () => ({
       activationContext,
-      completeWithDisplayName,
-      completeAfterFreeScan,
+      completeFromWelcome,
       completeAfterPlantSave,
-      intent,
-      displayName,
       isComplete: status === "complete",
       isLoading: status === "loading",
       refresh,
-      setIntent,
       skip,
       status
     }),
     [
       activationContext,
-      completeWithDisplayName,
-      completeAfterFreeScan,
+      completeFromWelcome,
       completeAfterPlantSave,
-      intent,
-      displayName,
       refresh,
-      setIntent,
       skip,
       status
     ]
@@ -217,10 +167,6 @@ export function useOnboarding() {
   }
 
   return context;
-}
-
-function isOnboardingIntent(value: string | null): value is OnboardingIntent {
-  return value === "new_plant_parent" || value === "growing_collector";
 }
 
 function parseActivationContext(value: string | null) {

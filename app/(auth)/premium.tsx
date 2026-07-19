@@ -6,11 +6,12 @@ import { PremiumContent } from "@/components/payments/PremiumContent";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { Screen } from "@/components/ui/Screen";
 import { theme } from "@/constants/theme";
+import { PREMIUM_PAYWALL_DESCRIPTION } from "@/lib/payments/paywallCopy";
 import { usePendingScan } from "@/providers/PendingScanProvider";
 
 /**
- * The premium/upgrade screen (Phase 13 §6). Reached only from Profile and
- * inline limit prompts — never a popup or launch interstitial.
+ * The premium/upgrade screen. A captured photo stays in memory while purchase
+ * or restore completes, then resumes automatically once server entitlement is ready.
  */
 export default function PremiumScreen() {
   const params = useLocalSearchParams<{ source?: string | string[] }>();
@@ -48,11 +49,7 @@ export default function PremiumScreen() {
 
       <Text style={styles.eyebrow}>Fernly Premium</Text>
       <Text style={styles.title}>Grow without limits</Text>
-      <Text style={styles.subtitle}>
-        Free includes one plant identification scan per day. Premium unlocks
-        diagnosis, saved plants, care info, reminders, weather tips, and growth
-        photos.
-      </Text>
+      <Text style={styles.subtitle}>{PREMIUM_PAYWALL_DESCRIPTION}</Text>
 
       <PremiumContent onPurchased={continueAfterPurchase} source={source ?? "premium_screen"} />
     </Screen>

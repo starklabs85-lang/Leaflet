@@ -5,8 +5,6 @@ export default function PublicLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="sign-in" />
       <Stack.Screen name="onboarding/welcome" />
-      <Stack.Screen name="onboarding/name" />
-      <Stack.Screen name="onboarding/intent" />
       <Stack.Screen name="onboarding/sign-in" />
       <Stack.Screen name="legal/privacy" />
       <Stack.Screen name="legal/eula" />

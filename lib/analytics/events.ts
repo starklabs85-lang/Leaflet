@@ -18,7 +18,6 @@ export const ANALYTICS_EVENTS = {
   MANAGE_SUBSCRIPTION_LINK: "manage_subscription_link",
   OFFER_CODE_REDEMPTION: "offer_code_redemption",
   ONBOARDING_COMPLETE: "onboarding_complete",
-  ONBOARDING_INTENT_SELECT: "onboarding_intent_select",
   ONBOARDING_SKIP: "onboarding_skip",
   PAYWALL_VIEW: "paywall_view",
   PHOTO_CAPTURE: "photo_capture",
