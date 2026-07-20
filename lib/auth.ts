@@ -3,14 +3,11 @@ import * as Crypto from "expo-crypto";
 import { Platform } from "react-native";
 
 import { env, getGoogleConfigIssue, hasGoogleConfig } from "@/lib/env";
+import {
+  completeNativeIdentitySignIn,
+  type NativeIdTokenCredentials
+} from "@/lib/nativeIdentityFlow";
 import { getSupabaseClient } from "@/lib/supabase";
-
-type NativeIdTokenCredentials = {
-  provider: "apple" | "google";
-  token: string;
-  access_token?: string;
-  nonce?: string;
-};
 
 type GoogleSignInModule = typeof import("@react-native-google-signin/google-signin");
 type DeleteAccountResponse =
@@ -153,24 +150,17 @@ export async function signInWithGoogleIdToken() {
 
 async function linkOrSignInWithIdToken(credentials: NativeIdTokenCredentials) {
   const supabase = getSupabaseClient();
-  const { data: current, error: currentError } = await supabase.auth.getUser();
 
-  if (currentError) throw currentError;
-
-  if (current.user?.is_anonymous) {
-    const { error: linkError } = await supabase.auth.linkIdentity(credentials);
-
-    if (!linkError) return;
-    if (!isExistingIdentityError(linkError)) throw linkError;
-  }
-
-  const { error } = await supabase.auth.signInWithIdToken(credentials);
-  if (error) throw error;
-}
-
-function isExistingIdentityError(error: { code?: string; message: string }) {
-  const value = `${error.code ?? ""} ${error.message}`.toLowerCase();
-  return value.includes("identity_already_exists") || value.includes("already linked");
+  await completeNativeIdentitySignIn(
+    {
+      getSession: () => supabase.auth.getSession(),
+      linkIdentity: (nextCredentials) =>
+        supabase.auth.linkIdentity(nextCredentials),
+      signInWithIdToken: (nextCredentials) =>
+        supabase.auth.signInWithIdToken(nextCredentials)
+    },
+    credentials
+  );
 }
 
 export async function signOutOfNativeProviders() {
