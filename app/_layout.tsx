@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useEffect, useState } from "react";
 import {
@@ -27,6 +27,10 @@ import { useCareReminderNotificationRouting } from "@/lib/notifications/careRemi
 import { getCareReminderSettings } from "@/lib/notifications/careReminders";
 import { getStoredUserLocation } from "@/lib/location/userLocation";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
+import {
+  AppInstallationProvider,
+  useAppInstallation
+} from "@/providers/AppInstallationProvider";
 import { ConnectivityProvider } from "@/providers/ConnectivityProvider";
 import {
   EntitlementProvider,
@@ -75,19 +79,43 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <EntitlementProvider>
-          <OnboardingProvider>
-            <PendingScanProvider>
-              <ConnectivityProvider>
-                <AnalyticsIdentitySync />
-                <AuthGate />
-              </ConnectivityProvider>
-            </PendingScanProvider>
-          </OnboardingProvider>
-        </EntitlementProvider>
-      </AuthProvider>
+      <AppInstallationProvider>
+        <InstallationGate />
+      </AppInstallationProvider>
     </SafeAreaProvider>
+  );
+}
+
+function InstallationGate() {
+  const installation = useAppInstallation();
+
+  if (installation.status !== "ready") {
+    return (
+      <LoadingScreen
+        message={
+          installation.errorMessage ??
+          (installation.status === "resetting"
+            ? "Resetting Fernly..."
+            : "Checking this installation...")
+        }
+        onRetry={installation.status === "error" ? installation.retry : undefined}
+      />
+    );
+  }
+
+  return (
+    <AuthProvider key={installation.generation}>
+      <EntitlementProvider>
+        <OnboardingProvider>
+          <PendingScanProvider>
+            <ConnectivityProvider>
+              <AnalyticsIdentitySync />
+              <AuthGate />
+            </ConnectivityProvider>
+          </PendingScanProvider>
+        </OnboardingProvider>
+      </EntitlementProvider>
+    </AuthProvider>
   );
 }
 
@@ -232,11 +260,29 @@ function getPendingAuthRedirect(
   return null;
 }
 
-function LoadingScreen({ message }: { message: string }) {
+function LoadingScreen({
+  message,
+  onRetry
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
   return (
     <View style={styles.loadingScreen}>
       <Text style={styles.loadingEyebrow}>Fernly</Text>
       <Text style={styles.loadingText}>{message}</Text>
+      {onRetry ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onRetry}
+          style={({ pressed }) => [
+            styles.retryButton,
+            pressed && styles.retryButtonPressed
+          ]}
+        >
+          <Text style={styles.retryButtonText}>Try again</Text>
+        </Pressable>
+      ) : null}
       <StatusBar style="dark" />
     </View>
   );
@@ -258,5 +304,19 @@ const styles = StyleSheet.create({
     ...theme.text.body,
     color: theme.colors.forest,
     textAlign: "center"
+  },
+  retryButton: {
+    backgroundColor: theme.colors.forest,
+    borderRadius: theme.radius.pill,
+    marginTop: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.sm
+  },
+  retryButtonPressed: {
+    opacity: 0.85
+  },
+  retryButtonText: {
+    ...theme.text.label,
+    color: theme.colors.white
   }
 });

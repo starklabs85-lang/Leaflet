@@ -79,6 +79,13 @@ export async function clearStoredUserLocation() {
   await SecureStore.deleteItemAsync(LOCATION_KEY);
 }
 
+export async function resetStoredUserLocation() {
+  await Promise.all([
+    SecureStore.deleteItemAsync(LOCATION_KEY),
+    SecureStore.deleteItemAsync(PROMPT_SEEN_KEY)
+  ]);
+}
+
 export function isLocationStale(
   location: StoredUserLocation,
   staleAfterDays = STALE_AFTER_DAYS

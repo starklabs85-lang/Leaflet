@@ -36,6 +36,10 @@ async function writeLastResponse(value: CachedResponse) {
   }
 }
 
+export async function resetWeatherTipsCache() {
+  await secureStorageAdapter.removeItem(LAST_RESPONSE_KEY);
+}
+
 export async function fetchWeatherTips(
   location: StoredUserLocation
 ): Promise<WeatherTipsResult> {

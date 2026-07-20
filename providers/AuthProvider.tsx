@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
+import { deleteAccountThenReset } from "@/lib/accountDeletionFlow";
 import {
   deleteAccount as deleteSupabaseAccount,
   isUserCancelledAuthError,
@@ -24,6 +25,7 @@ import {
 } from "@/lib/analytics/firebaseAnalytics";
 import { getSupabaseConfigIssue, hasSupabaseConfig } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
+import { useAppInstallation } from "@/providers/AppInstallationProvider";
 
 type AuthStatus = "loading" | "authenticated" | "signed-out" | "missing-config";
 type AuthProviderName = "apple" | "google";
@@ -48,6 +50,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const { resetToNewUser } = useAppInstallation();
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -217,9 +220,28 @@ export function AuthProvider({ children }: PropsWithChildren) {
       throw new Error(message);
     }
 
+    let remoteAccountDeleted = false;
+
     try {
-      await deleteSupabaseAccount();
+      await deleteAccountThenReset({
+        deleteRemoteAccount: async () => {
+          await deleteSupabaseAccount();
+          remoteAccountDeleted = true;
+          await trackAction(ANALYTICS_EVENTS.ACCOUNT_DELETE_RESULT, {
+            result: "success"
+          });
+        },
+        resetToNewUser: () =>
+          resetToNewUser({
+            reason: "account_deleted",
+            userId: session?.user.id
+          })
+      });
     } catch (error) {
+      if (remoteAccountDeleted) {
+        throw error;
+      }
+
       const message = formatAccountDeletionError(error);
 
       void trackAction(ANALYTICS_EVENTS.ACCOUNT_DELETE_RESULT, {
@@ -229,25 +251,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setErrorMessage(message);
       throw error instanceof Error ? error : new Error(message);
     }
-
-    const { error: signOutError } = await getSupabaseClient().auth.signOut({
-      scope: "local"
-    });
-    await signOutOfNativeProviders();
-
-    if (signOutError) {
-      console.warn("Fernly local sign-out after account deletion failed", {
-        message: signOutError.message
-      });
-    }
-
-    await trackAction(ANALYTICS_EVENTS.ACCOUNT_DELETE_RESULT, {
-      result: "success"
-    });
-    await clearAnalyticsUser();
-    setSession(null);
-    setStatus("signed-out");
-  }, []);
+  }, [resetToNewUser, session?.user.id]);
 
   const clearError = useCallback(() => {
     setErrorMessage(null);

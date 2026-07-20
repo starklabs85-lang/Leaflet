@@ -45,6 +45,14 @@ export async function markStreakMilestoneCelebrated({
   );
 }
 
+export async function resetStreakMilestones(userId: string | null | undefined) {
+  if (!userId) {
+    return;
+  }
+
+  await secureStorageAdapter.removeItem(getMilestoneKey(userId));
+}
+
 async function readCelebratedMilestones(userId: string) {
   const value = await secureStorageAdapter.getItem(getMilestoneKey(userId));
   const milestones = new Set<StreakMilestone>();

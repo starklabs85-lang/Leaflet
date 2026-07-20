@@ -25,6 +25,11 @@ export function getSupabaseClient() {
   return client;
 }
 
+export function disposeSupabaseClient() {
+  client?.auth.stopAutoRefresh();
+  client = null;
+}
+
 export async function getSupabaseSessionHealth() {
   if (!hasSupabaseConfig()) {
     return {

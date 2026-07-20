@@ -15,6 +15,13 @@ const LAST_ALERT_DATE_KEY = "leaflet.weather-alert-last-date";
 
 const EVENING_ALERT_HOUR = 17;
 
+export async function resetWeatherAlertState() {
+  await Promise.all([
+    SecureStore.deleteItemAsync(ENABLED_KEY),
+    SecureStore.deleteItemAsync(LAST_ALERT_DATE_KEY)
+  ]);
+}
+
 export type WeatherAlertResult =
   | { ok: true; enabled: boolean }
   | { ok: false; message: string };

@@ -23,3 +23,7 @@ export async function markTrialIntroSeen() {
     // Worst case the intro could show again next first-save; never block saving.
   }
 }
+
+export async function resetTrialIntroState() {
+  await secureStorageAdapter.removeItem(TRIAL_INTRO_SEEN_KEY);
+}

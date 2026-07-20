@@ -41,6 +41,19 @@ const ONBOARDING_COMPLETE_KEY = "onboarding_complete";
 // SecureStore rejects ":" in keys, so namespaces use "." (alphanumeric, ".", "-", "_" only).
 const ONBOARDING_SKIPPED_KEY = "leaflet.onboarding_skipped";
 const ONBOARDING_ACTIVATION_KEY = "leaflet.onboarding_activation";
+const LEGACY_ONBOARDING_KEYS = [
+  "leaflet.onboarding_intent",
+  "leaflet.onboarding_display_name"
+] as const;
+
+export async function resetOnboardingStorage() {
+  await Promise.all([
+    secureStorageAdapter.removeItem(ONBOARDING_COMPLETE_KEY),
+    secureStorageAdapter.removeItem(ONBOARDING_SKIPPED_KEY),
+    secureStorageAdapter.removeItem(ONBOARDING_ACTIVATION_KEY),
+    ...LEGACY_ONBOARDING_KEYS.map((key) => secureStorageAdapter.removeItem(key))
+  ]);
+}
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
@@ -59,10 +72,9 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
         secureStorageAdapter.getItem(ONBOARDING_ACTIVATION_KEY)
       ]);
 
-      await Promise.all([
-        secureStorageAdapter.removeItem("leaflet.onboarding_intent"),
-        secureStorageAdapter.removeItem("leaflet.onboarding_display_name")
-      ]).catch(() => undefined);
+      await Promise.all(
+        LEGACY_ONBOARDING_KEYS.map((key) => secureStorageAdapter.removeItem(key))
+      ).catch(() => undefined);
       setActivationContext(parseActivationContext(activation));
 
       if (complete === "true") {

@@ -239,6 +239,16 @@ export async function cancelAllCareReminders() {
   await writeScheduleStore({ version: 1, tasks: {} });
 }
 
+export async function resetCareReminderState() {
+  await Notifications.cancelAllScheduledNotificationsAsync();
+  await Promise.all([
+    SecureStore.deleteItemAsync(ENABLED_KEY),
+    SecureStore.deleteItemAsync(PROMPT_SEEN_KEY),
+    secureStorageAdapter.removeItem(SCHEDULE_STORE_KEY)
+  ]);
+  lastHandledNotificationId = null;
+}
+
 function parseLocalDate(dateString: string) {
   const [yearText, monthText, dayText] = dateString.split("-");
 
