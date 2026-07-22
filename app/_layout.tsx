@@ -26,6 +26,7 @@ import { useFirebaseScreenTracking } from "@/lib/analytics/useFirebaseScreenTrac
 import { useCareReminderNotificationRouting } from "@/lib/notifications/careReminders";
 import { getCareReminderSettings } from "@/lib/notifications/careReminders";
 import { getStoredUserLocation } from "@/lib/location/userLocation";
+import { requiresAnonymousOnboarding } from "@/lib/onboarding/flow";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import {
   AppInstallationProvider,
@@ -171,7 +172,12 @@ function AuthGate() {
   const isAppLoading = auth.status === "loading" || onboarding.isLoading;
   const pendingRedirect = isAppLoading
     ? null
-    : getPendingAuthRedirect(routeSegments, auth.status, onboarding.status);
+    : getPendingAuthRedirect(
+        routeSegments,
+        auth.status,
+        auth.isAnonymous,
+        onboarding.status
+      );
   useCareReminderNotificationRouting(auth.status === "authenticated");
   useFirebaseScreenTracking({
     enabled: !isAppLoading && pendingRedirect === null,
@@ -224,6 +230,7 @@ function getAnalyticsAuthProvider(user: ReturnType<typeof useAuth>["user"]) {
 function getPendingAuthRedirect(
   routeSegments: string[],
   authStatus: ReturnType<typeof useAuth>["status"],
+  isAnonymous: boolean,
   onboardingStatus: ReturnType<typeof useOnboarding>["status"]
 ) {
   const isPublicRoute = routeSegments[0] === "(public)";
@@ -238,14 +245,12 @@ function getPendingAuthRedirect(
     routeSegments[0] === "(auth)" && routeSegments[1] === "premium";
 
   if (!isAuthenticated && !isPublicRoute) {
-    return onboardingStatus === "needs_onboarding"
-      ? "/(public)/onboarding/welcome"
-      : "/(public)/sign-in";
+    return "/(public)/onboarding/welcome";
   }
 
   if (
     isAuthenticated &&
-    onboardingStatus === "needs_onboarding" &&
+    requiresAnonymousOnboarding(isAnonymous, onboardingStatus) &&
     !isPublicOnboardingRoute &&
     !isOnboardingScanRoute &&
     !isOnboardingPremiumRoute

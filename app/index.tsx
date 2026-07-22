@@ -1,5 +1,6 @@
 import { Redirect } from "expo-router";
 
+import { getOnboardingEntryRoute } from "@/lib/onboarding/flow";
 import { useOnboarding } from "@/providers/OnboardingProvider";
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -11,17 +12,9 @@ export default function IndexRoute() {
     return null;
   }
 
-  if (auth.status === "authenticated") {
-    if (onboarding.status === "needs_onboarding") {
-      return <Redirect href={"/(public)/onboarding/welcome" as never} />;
-    }
-
-    return <Redirect href="/(auth)/(tabs)/home" />;
-  }
-
-  if (onboarding.status === "needs_onboarding") {
-    return <Redirect href={"/(public)/onboarding/welcome" as never} />;
-  }
-
-  return <Redirect href="/(public)/sign-in" />;
+  return (
+    <Redirect
+      href={getOnboardingEntryRoute(auth.status, onboarding.status) as never}
+    />
+  );
 }

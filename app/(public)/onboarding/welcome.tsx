@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,17 +9,11 @@ import { LeafDecor } from "@/components/illustrations/LeafDecor";
 import { PlantMascot } from "@/components/illustrations/PlantMascot";
 import { Button } from "@/components/ui/Button";
 import { theme } from "@/constants/theme";
-import { useAuth } from "@/providers/AuthProvider";
-import { useOnboarding } from "@/providers/OnboardingProvider";
 
 export default function OnboardingWelcomeScreen() {
-  const auth = useAuth();
-  const onboarding = useOnboarding();
   const insets = useSafeAreaInsets();
   const fade = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(28)).current;
-  const [error, setError] = useState<string | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
@@ -38,22 +32,6 @@ export default function OnboardingWelcomeScreen() {
   }, [fade, lift]);
 
   const entrance = { opacity: fade, transform: [{ translateY: lift }] };
-
-  async function getStarted() {
-    if (isStarting) return;
-
-    setIsStarting(true);
-    setError(null);
-    try {
-      await auth.ensureAnonymousSession();
-      await onboarding.completeFromWelcome();
-      router.replace("/(auth)/(tabs)/home" as never);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Fernly could not start your private session.");
-    } finally {
-      setIsStarting(false);
-    }
-  }
 
   return (
     <View style={styles.root}>
@@ -96,15 +74,14 @@ export default function OnboardingWelcomeScreen() {
 
           <Button
             accessibilityLabel="Get started with Fernly onboarding"
-            disabled={isStarting}
             gradient
             icon="arrow-right"
             iconPosition="trailing"
-            label={isStarting ? "Preparing your dashboard..." : "Get started"}
-            loading={isStarting}
-            onPress={getStarted}
+            label="Get started"
+            onPress={() =>
+              router.push("/(public)/onboarding/account-choice" as never)
+            }
           />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
         </Animated.View>
       </ScrollView>
     </View>
@@ -178,10 +155,5 @@ const styles = StyleSheet.create({
   dotActive: {
     backgroundColor: theme.colors.forest,
     width: 22
-  },
-  error: {
-    ...theme.text.caption,
-    color: theme.colors.terra,
-    marginTop: theme.spacing.md
   }
 });
