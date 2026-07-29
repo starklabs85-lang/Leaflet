@@ -3,7 +3,6 @@ import { Linking, Platform, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
-import type { PurchasesPackage } from "react-native-purchases";
 
 import { Button } from "@/components/ui/Button";
 import { PressableScale } from "@/components/ui/PressableScale";
@@ -97,7 +96,6 @@ export function PremiumContent({
     expiresAt,
     isLoading,
     monthlyPackage,
-    annualPackage,
     trialEligibilityByProductId,
     purchase,
     restore,
@@ -105,7 +103,6 @@ export function PremiumContent({
     syncIdentity,
     waitForServerPremium
   } = useEntitlement();
-  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">("annual");
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -113,16 +110,9 @@ export function PremiumContent({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showIdentityGate, setShowIdentityGate] = useState(false);
 
-  const selectedPackage =
-    selectedPlan === "annual" ? (annualPackage ?? monthlyPackage) : monthlyPackage;
-  const selectedPackagePeriod =
-    selectedPackage?.product.identifier === annualPackage?.product.identifier
-      ? "year"
-      : "month";
-  const selectedPackageTrialEligible = selectedPackage
-    ? trialEligibilityByProductId[selectedPackage.product.identifier] === true
+  const monthlyTrialEligible = monthlyPackage
+    ? trialEligibilityByProductId[monthlyPackage.product.identifier] === true
     : false;
-  const annualSavingPercent = getAnnualSavingPercent(monthlyPackage, annualPackage);
 
   useEffect(() => {
     void trackAction(ANALYTICS_EVENTS.PAYWALL_VIEW, {
@@ -148,23 +138,23 @@ export function PremiumContent({
   }
 
   async function performPurchase() {
-    if (!selectedPackage || isPurchasing) {
+    if (!monthlyPackage || isPurchasing) {
       return;
     }
 
     setIsPurchasing(true);
     setFeedback(null);
     void trackAction(ANALYTICS_EVENTS.PURCHASE_START, {
-      plan: selectedPlan,
+      plan: "monthly",
       source,
-      trial_eligible: selectedPackageTrialEligible
+      trial_eligible: monthlyTrialEligible
     });
 
-    const outcome = await purchase(selectedPackage);
+    const outcome = await purchase(monthlyPackage);
 
     setIsPurchasing(false);
     void trackAction(ANALYTICS_EVENTS.PURCHASE_RESULT, {
-      plan: selectedPlan,
+      plan: "monthly",
       result: outcome.status,
       source
     });
@@ -318,7 +308,7 @@ export function PremiumContent({
     <View style={styles.container}>
       <ComparisonTable />
 
-      {!isLoading && !monthlyPackage && !annualPackage ? (
+      {!isLoading && !monthlyPackage ? (
         <View style={styles.unavailableCard}>
           <MaterialCommunityIcons
             color={theme.colors.moss}
@@ -331,37 +321,9 @@ export function PremiumContent({
         </View>
       ) : (
         <View style={styles.planSection}>
-          {annualPackage ? (
-            <PlanOption
-              badge={
-                annualSavingPercent
-                  ? `Save ${annualSavingPercent}%`
-                  : "Best value"
-              }
-              label="Annual"
-              priceText={`${annualPackage.product.priceString} / year`}
-              selected={selectedPlan === "annual"}
-              onPress={() => {
-                setSelectedPlan("annual");
-                void trackAction(ANALYTICS_EVENTS.PLAN_SELECT, {
-                  plan: "annual",
-                  source
-                });
-              }}
-            />
-          ) : null}
           {monthlyPackage ? (
-            <PlanOption
-              label="Monthly"
+            <MonthlyPlanPrice
               priceText={`${monthlyPackage.product.priceString} / month`}
-              selected={selectedPlan === "monthly"}
-              onPress={() => {
-                setSelectedPlan("monthly");
-                void trackAction(ANALYTICS_EVENTS.PLAN_SELECT, {
-                  plan: "monthly",
-                  source
-                });
-              }}
             />
           ) : null}
 
@@ -393,17 +355,17 @@ export function PremiumContent({
 
           <Button
             accessibilityLabel={
-              selectedPackageTrialEligible
+              monthlyTrialEligible
                 ? "Start 3-day free trial"
                 : "Upgrade to Premium"
             }
-            disabled={!selectedPackage || isPurchasing}
+            disabled={!monthlyPackage || isPurchasing}
             gradient
             icon="leaf"
             label={
               isPurchasing
                 ? "Connecting to the store..."
-                : selectedPackageTrialEligible
+                : monthlyTrialEligible
                   ? "Start 3-day free trial"
                   : "Upgrade to Premium"
             }
@@ -411,10 +373,10 @@ export function PremiumContent({
             onPress={handlePurchase}
             style={styles.purchaseButton}
           />
-          {selectedPackageTrialEligible ? (
+          {monthlyTrialEligible ? (
             <Text style={styles.trialHint}>
-              Free for 3 days, then {selectedPackage?.product.priceString ?? ""}
-              {` per ${selectedPackagePeriod}`}. Cancel
+              Free for 3 days, then {monthlyPackage?.product.priceString ?? ""}
+              {" per month"}. Cancel
               anytime before the trial ends and you won't be charged.
             </Text>
           ) : null}
@@ -580,60 +542,20 @@ function ComparisonValue({
   );
 }
 
-function PlanOption({
-  badge,
-  label,
-  priceText,
-  selected,
-  onPress
-}: {
-  badge?: string;
-  label: string;
-  priceText: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
+function MonthlyPlanPrice({ priceText }: { priceText: string }) {
   return (
-    <PressableScale
-      accessibilityLabel={`Choose the ${label} plan, ${priceText}`}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.planOption, selected ? styles.planOptionSelected : null]}
-    >
+    <View style={[styles.planOption, styles.planOptionSelected]}>
       <MaterialCommunityIcons
-        color={selected ? theme.colors.forest : theme.colors.moss}
-        name={selected ? "radiobox-marked" : "radiobox-blank"}
+        color={theme.colors.forest}
+        name="calendar-month-outline"
         size={22}
       />
       <View style={styles.planText}>
-        <Text style={styles.planLabel}>{label}</Text>
+        <Text style={styles.planLabel}>Monthly</Text>
         <Text style={styles.planPrice}>{priceText}</Text>
       </View>
-      {badge ? (
-        <View style={styles.planBadge}>
-          <Text style={styles.planBadgeText}>{badge}</Text>
-        </View>
-      ) : null}
-    </PressableScale>
+    </View>
   );
-}
-
-function getAnnualSavingPercent(
-  monthly: PurchasesPackage | null,
-  annual: PurchasesPackage | null
-) {
-  if (!monthly || !annual) {
-    return null;
-  }
-
-  const monthlyYearTotal = monthly.product.price * 12;
-
-  if (monthlyYearTotal <= 0 || annual.product.price >= monthlyYearTotal) {
-    return null;
-  }
-
-  return Math.round((1 - annual.product.price / monthlyYearTotal) * 100);
 }
 
 function formatDate(isoDate: string) {
@@ -728,17 +650,6 @@ const styles = StyleSheet.create({
   planPrice: {
     ...theme.text.bodyMuted,
     marginTop: 2
-  },
-  planBadge: {
-    backgroundColor: theme.colors.honey,
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs
-  },
-  planBadgeText: {
-    color: theme.colors.ochre,
-    fontFamily: theme.typography.fontFamily.bodyBlack,
-    fontSize: theme.typography.caption
   },
   purchaseButton: {
     marginTop: theme.spacing.sm

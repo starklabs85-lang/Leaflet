@@ -54,7 +54,6 @@ export default function ProfileScreen() {
   const nativeVersion =
     Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? "1.0";
   const hasProfileTrial = isProfileTrialEligible({
-    annualProductId: entitlement.annualPackage?.product.identifier,
     monthlyProductId: entitlement.monthlyPackage?.product.identifier,
     trialEligibilityByProductId: entitlement.trialEligibilityByProductId
   });

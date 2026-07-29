@@ -41,7 +41,6 @@ type EntitlementContextValue = EntitlementSnapshot & {
   isLoading: boolean;
   offering: PurchasesOffering | null;
   monthlyPackage: PurchasesPackage | null;
-  annualPackage: PurchasesPackage | null;
   trialEligibilityByProductId: Record<string, boolean>;
   purchase: (pkg: PurchasesPackage) => Promise<PurchaseOutcome>;
   restore: () => Promise<RestoreOutcome>;
@@ -128,11 +127,8 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
 
           setOffering(currentOffering);
 
-          const annual = currentOffering?.annual ?? null;
           const monthly = currentOffering?.monthly ?? null;
-          const packages = [monthly, annual].filter(
-            (pkg): pkg is PurchasesPackage => Boolean(pkg)
-          );
+          const packages = monthly ? [monthly] : [];
           const eligibilityEntries = await Promise.all(
             packages.map(async (pkg) => [
               pkg.product.identifier,
@@ -242,7 +238,6 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
       isLoading,
       offering,
       monthlyPackage: offering?.monthly ?? null,
-      annualPackage: offering?.annual ?? null,
       trialEligibilityByProductId,
       purchase,
       restore,
