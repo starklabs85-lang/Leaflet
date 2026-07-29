@@ -8,6 +8,7 @@ import {
   type NativeIdTokenCredentials
 } from "@/lib/nativeIdentityFlow";
 import { getSupabaseClient } from "@/lib/supabase";
+import { getAppsFlyerUidForDeletion } from "@/lib/measurement/runtime";
 
 type GoogleSignInModule = typeof import("@react-native-google-signin/google-signin");
 type DeleteAccountResponse =
@@ -109,13 +110,13 @@ export async function signInWithAppleIdToken() {
     throw new Error("Apple did not return an identity token. Please try again.");
   }
 
-  await linkOrSignInWithIdToken({
+  const identityResult = await linkOrSignInWithIdToken({
     provider: "apple",
     token: credential.identityToken,
     nonce: rawNonce
   });
 
-  return { cancelled: false };
+  return { cancelled: false, identityResult };
 }
 
 export async function signInWithGoogleIdToken() {
@@ -139,19 +140,19 @@ export async function signInWithGoogleIdToken() {
 
   const tokens = await GoogleSignin.getTokens();
 
-  await linkOrSignInWithIdToken({
+  const identityResult = await linkOrSignInWithIdToken({
     provider: "google",
     token: response.data.idToken,
     access_token: tokens.accessToken
   });
 
-  return { cancelled: false };
+  return { cancelled: false, identityResult };
 }
 
 async function linkOrSignInWithIdToken(credentials: NativeIdTokenCredentials) {
   const supabase = getSupabaseClient();
 
-  await completeNativeIdentitySignIn(
+  return completeNativeIdentitySignIn(
     {
       getSession: () => supabase.auth.getSession(),
       linkIdentity: (nextCredentials) =>
@@ -194,10 +195,12 @@ export async function deleteAccount() {
     throw new Error("Please sign in again before deleting your account.");
   }
 
+  const appsflyerUid = await getAppsFlyerUidForDeletion().catch(() => null);
+
   const { data, error } = await supabase.functions.invoke<DeleteAccountResponse>(
     "delete-account",
     {
-      body: {}
+      body: { appsflyerUid }
     }
   );
 

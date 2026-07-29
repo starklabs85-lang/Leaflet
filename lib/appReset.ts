@@ -4,6 +4,7 @@ import { signOutOfNativeProviders } from "@/lib/auth";
 import { resetStreakMilestones } from "@/lib/careStreakMilestones";
 import { env, hasSupabaseConfig } from "@/lib/env";
 import { resetStoredUserLocation } from "@/lib/location/userLocation";
+import { clearPendingDeepLink } from "@/lib/deepLinks/pendingOneLink";
 import { runLocalResetSteps } from "@/lib/localResetFlow";
 import { resetCareReminderState } from "@/lib/notifications/careReminders";
 import { resetWeatherAlertState } from "@/lib/notifications/weatherAlerts";
@@ -76,6 +77,7 @@ export async function resetLocalAppState({
       resetStoredUserLocation,
       resetWeatherTipsCache,
       resetTrialIntroState,
+      clearPendingDeepLink,
       () => resetStreakMilestones(resolvedUserId)
     ]
   });

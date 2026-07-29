@@ -7,6 +7,7 @@ import Purchases, {
 } from "react-native-purchases";
 
 import { env, hasRevenueCatConfig } from "@/lib/env";
+import { getRevenueCatAppsFlyerSharingAttributes } from "@/lib/payments/appsflyerAttribution";
 
 /**
  * Thin wrapper around the RevenueCat SDK so the rest of the app never imports
@@ -35,6 +36,9 @@ export const FREE_ENTITLEMENT: EntitlementSnapshot = {
 };
 
 let configured = false;
+let pendingAppsFlyerId: string | null = null;
+let attributionSyncBeforePurchase: (() => Promise<void>) | null = null;
+let appsFlyerSharingAllowed = false;
 
 export function isPurchasesConfigured() {
   return configured;
@@ -60,7 +64,50 @@ export function configurePurchases() {
   Purchases.configure({ apiKey });
   configured = true;
 
+  if (pendingAppsFlyerId) {
+    void Purchases.setAppsflyerID(pendingAppsFlyerId).catch(() => undefined);
+  }
+  void applyAppsFlyerSharingFilter().catch(() => undefined);
+
   return true;
+}
+
+/**
+ * RevenueCat forwards subscription lifecycle and gross revenue to AppsFlyer.
+ * Only the AppsFlyer UID is set here; Fernly never asks RevenueCat to collect
+ * device identifiers and never supplies IDFA.
+ */
+export async function setRevenueCatAppsFlyerId(uid: string | null) {
+  pendingAppsFlyerId = uid;
+
+  if (configured) {
+    await Purchases.setAppsflyerID(uid);
+  }
+}
+
+/**
+ * RevenueCat sends subscription lifecycle events from its servers, so stopping
+ * the AppsFlyer client SDK is not sufficient on consent withdrawal. This
+ * reserved attribute blocks those S2S partner postbacks until consent exists.
+ */
+export async function setRevenueCatAppsFlyerSharingAllowed(allowed: boolean) {
+  appsFlyerSharingAllowed = allowed;
+
+  if (configured) {
+    await applyAppsFlyerSharingFilter();
+  }
+}
+
+async function applyAppsFlyerSharingFilter() {
+  await Purchases.setAttributes(
+    getRevenueCatAppsFlyerSharingAttributes(appsFlyerSharingAllowed)
+  );
+}
+
+export function registerRevenueCatAttributionSync(
+  sync: (() => Promise<void>) | null
+) {
+  attributionSyncBeforePurchase = sync;
 }
 
 /**
@@ -74,6 +121,7 @@ export async function logInPurchases(supabaseUserId: string) {
   }
 
   const { customerInfo } = await Purchases.logIn(supabaseUserId);
+  await applyAppsFlyerSharingFilter().catch(() => undefined);
 
   return customerInfo;
 }
@@ -88,6 +136,7 @@ export async function logOutPurchases() {
   // logOut throws if the current user is already anonymous.
   if (!isAnonymous) {
     await Purchases.logOut();
+    await applyAppsFlyerSharingFilter().catch(() => undefined);
   }
 }
 
@@ -153,6 +202,8 @@ export async function purchasePremiumPackage(
   }
 
   try {
+    await applyAppsFlyerSharingFilter().catch(() => undefined);
+    await attributionSyncBeforePurchase?.().catch(() => undefined);
     const { customerInfo } = await Purchases.purchasePackage(pkg);
 
     return { status: "purchased", customerInfo };

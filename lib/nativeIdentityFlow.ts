@@ -45,7 +45,7 @@ export async function completeNativeIdentitySignIn(
 
     if (!linked.error) {
       requirePermanentSession(linked);
-      return;
+      return "created" as const;
     }
 
     if (!isExistingIdentityError(linked.error)) {
@@ -60,6 +60,7 @@ export async function completeNativeIdentitySignIn(
   }
 
   requirePermanentSession(signedIn);
+  return "returning" as const;
 }
 
 function requirePermanentSession(result: AuthOperationResult) {

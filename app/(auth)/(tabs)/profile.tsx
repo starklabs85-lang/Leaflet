@@ -47,6 +47,7 @@ import { getGreeting } from "@/lib/greeting";
 import { isProfileTrialEligible } from "@/lib/payments/profileTrialCta";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEntitlement } from "@/providers/EntitlementProvider";
+import { showPrivacyChoices } from "@/lib/measurement/runtime";
 
 export default function ProfileScreen() {
   const auth = useAuth();
@@ -71,6 +72,8 @@ export default function ProfileScreen() {
   const [weatherAlertsOn, setWeatherAlertsOn] = useState<boolean | null>(null);
   const [weatherMessage, setWeatherMessage] = useState<string | null>(null);
   const [isUpdatingWeatherAlerts, setIsUpdatingWeatherAlerts] = useState(false);
+  const [isUpdatingPrivacyChoices, setIsUpdatingPrivacyChoices] =
+    useState(false);
   const [weatherLocation, setWeatherLocation] =
     useState<StoredUserLocation | null>(null);
 
@@ -164,6 +167,27 @@ export default function ProfileScreen() {
       void setAnalyticsUser(auth.user.id, {
         weather_location_source: "none"
       });
+    }
+  }
+
+  async function openPrivacyChoices() {
+    if (isUpdatingPrivacyChoices) {
+      return;
+    }
+
+    setIsUpdatingPrivacyChoices(true);
+
+    try {
+      const state = await showPrivacyChoices();
+
+      if (state === "misconfigured") {
+        Alert.alert(
+          "Privacy choices unavailable",
+          "Fernly could not load the privacy service. Analytics remains off."
+        );
+      }
+    } finally {
+      setIsUpdatingPrivacyChoices(false);
     }
   }
 
@@ -357,6 +381,22 @@ export default function ProfileScreen() {
 
       <Text style={styles.sectionLabel}>About</Text>
       <Card padded={false} style={styles.card}>
+        <SettingsLinkRow
+          icon="tune-variant"
+          analytics={{
+            tapName: ANALYTICS_TAPS.PROFILE_PRIVACY_CHOICES,
+            params: { surface: "profile" }
+          }}
+          onPress={() => {
+            void openPrivacyChoices();
+          }}
+          title={
+            isUpdatingPrivacyChoices
+              ? "Loading privacy choices..."
+              : "Privacy choices"
+          }
+        />
+        <View style={styles.divider} />
         <SettingsLinkRow
           icon="shield-account-outline"
           analytics={{

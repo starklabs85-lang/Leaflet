@@ -1,6 +1,9 @@
 import type { ExpoConfig } from "expo/config";
 
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME;
+const appsFlyerOneLinkHost = normalizeHttpsHost(
+  process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN
+);
 const cameraPermission =
   "Fernly uses your camera to take plant photos for identification, health diagnosis, and growth tracking—for example, photographing a leaf to identify the plant or check for disease.";
 const photoLibraryPermission =
@@ -21,8 +24,17 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.countrybean.leaflet",
     usesAppleSignIn: true,
     googleServicesFile: "./GoogleService-Info.plist",
+    ...(appsFlyerOneLinkHost
+      ? { associatedDomains: [`applinks:${appsFlyerOneLinkHost}`] }
+      : {}),
     infoPlist: {
-      ITSAppUsesNonExemptEncryption: false
+      ITSAppUsesNonExemptEncryption: false,
+      FirebaseAnalyticsCollectionEnabled: false,
+      FirebaseAutomaticScreenReportingEnabled: false,
+      NSAdvertisingAttributionReportEndpoint:
+        "https://appsflyer-skadnetwork.com/",
+      AdAttributionKit: "https://appsflyer-skadnetwork.com/",
+      EligibleForAdAttributionKitReengagementPostbackCopies: true
     }
   },
   android: {
@@ -51,6 +63,14 @@ const config: ExpoConfig = {
     ],
     "expo-notifications",
     "expo-apple-authentication",
+    [
+      "react-native-appsflyer",
+      {
+        shouldUseStrictMode: false,
+        shouldUsePurchaseConnector: false,
+        preferAppsFlyerBackupRules: false
+      }
+    ],
     [
       "expo-location",
       {
@@ -96,10 +116,41 @@ const config: ExpoConfig = {
     googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
     googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "",
     googleIosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ?? "",
+    appsFlyerIosAppId:
+      process.env.EXPO_PUBLIC_APPSFLYER_IOS_APP_ID ?? "6775880316",
+    appsFlyerOneLinkDomain:
+      process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN ?? "",
+    appsFlyerOneLinkTemplateId:
+      process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID ?? "",
+    usercentricsSettingsId:
+      process.env.EXPO_PUBLIC_USERCENTRICS_SETTINGS_ID ?? "",
     eas: {
       projectId: "63ea258d-3a71-4b3e-b43b-0d1d94baa969"
     }
   }
 };
+
+function normalizeHttpsHost(value: string | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  const candidate = trimmed.includes("://") ? trimmed : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(candidate);
+
+    return parsed.protocol === "https:" &&
+      parsed.hostname.endsWith(".onelink.me") &&
+      parsed.pathname === "/" &&
+      !parsed.search &&
+      !parsed.hash
+      ? parsed.hostname
+      : "";
+  } catch {
+    return "";
+  }
+}
 
 export default config;

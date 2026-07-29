@@ -6,6 +6,15 @@ export const env = {
   googleIosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ?? "",
   revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? "",
   revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? "",
+  appsFlyerDevKey: process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? "",
+  appsFlyerIosAppId:
+    process.env.EXPO_PUBLIC_APPSFLYER_IOS_APP_ID ?? "6775880316",
+  appsFlyerOneLinkDomain:
+    process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN ?? "",
+  appsFlyerOneLinkTemplateId:
+    process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID ?? "",
+  usercentricsSettingsId:
+    process.env.EXPO_PUBLIC_USERCENTRICS_SETTINGS_ID ?? "",
   devTestEmail: process.env.EXPO_PUBLIC_DEV_TEST_EMAIL ?? "",
   devTestPassword: process.env.EXPO_PUBLIC_DEV_TEST_PASSWORD ?? ""
 };
@@ -82,4 +91,12 @@ export function getGoogleConfigIssue() {
   ].filter(Boolean);
 
   return `Missing ${missing.join(", ")}. Add the public Google OAuth client values from Google Cloud.`;
+}
+
+export function hasMeasurementConfig() {
+  return Boolean(
+    env.appsFlyerDevKey &&
+      env.appsFlyerIosAppId === "6775880316" &&
+      env.usercentricsSettingsId
+  );
 }

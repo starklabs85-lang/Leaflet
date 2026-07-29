@@ -122,6 +122,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
           provider,
           result: "success"
         });
+        const identityResult = getIdentityResult(result);
+
+        if (identityResult === "created") {
+          void trackAction(ANALYTICS_EVENTS.PERMANENT_ACCOUNT_CREATED, {
+            provider
+          });
+        } else if (identityResult === "returning") {
+          void trackAction(ANALYTICS_EVENTS.RETURNING_SIGN_IN, {
+            provider
+          });
+        }
 
         return true;
       } catch (error) {
@@ -178,7 +189,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signInWithGoogle = useCallback(
     async () =>
       runAuthAction("google", async () => {
-        await signInWithGoogleIdToken();
+        return signInWithGoogleIdToken();
       }),
     [runAuthAction]
   );
@@ -333,6 +344,21 @@ function isCancelledAuthOutcome(value: unknown) {
     "cancelled" in value &&
     (value as { cancelled?: unknown }).cancelled === true
   );
+}
+
+function getIdentityResult(value: unknown) {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "identityResult" in value &&
+    ((value as { identityResult?: unknown }).identityResult === "created" ||
+      (value as { identityResult?: unknown }).identityResult === "returning")
+  ) {
+    return (value as { identityResult: "created" | "returning" })
+      .identityResult;
+  }
+
+  return null;
 }
 
 function getAuthFailureReason(error: unknown) {

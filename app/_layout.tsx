@@ -20,6 +20,8 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { theme } from "@/constants/theme";
 import {
   clearAnalyticsUser,
+  ANALYTICS_EVENTS,
+  trackAction,
   setAnalyticsUser
 } from "@/lib/analytics/firebaseAnalytics";
 import { useFirebaseScreenTracking } from "@/lib/analytics/useFirebaseScreenTracking";
@@ -39,6 +41,15 @@ import {
 } from "@/providers/EntitlementProvider";
 import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
 import { PendingScanProvider } from "@/providers/PendingScanProvider";
+import {
+  applyMeasurementConsent,
+  initializeMeasurement
+} from "@/lib/measurement/runtime";
+import {
+  subscribeToPendingDeepLinks,
+  takePendingDeepLink
+} from "@/lib/deepLinks/pendingOneLink";
+import type { DeepLinkIntent } from "@/lib/deepLinks/oneLink";
 
 // Keep the native splash visible until the brand fonts are ready so we never
 // flash system type. Errors here are non-fatal (we still fall back gracefully).
@@ -110,6 +121,7 @@ function InstallationGate() {
         <OnboardingProvider>
           <PendingScanProvider>
             <ConnectivityProvider>
+              <MeasurementBootstrap />
               <AnalyticsIdentitySync />
               <AuthGate />
             </ConnectivityProvider>
@@ -118,6 +130,28 @@ function InstallationGate() {
       </EntitlementProvider>
     </AuthProvider>
   );
+}
+
+function MeasurementBootstrap() {
+  useEffect(() => {
+    let active = true;
+
+    async function bootstrap() {
+      const state = await initializeMeasurement();
+
+      if (active && state === "waiting_for_consent") {
+        await applyMeasurementConsent();
+      }
+    }
+
+    void bootstrap();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return null;
 }
 
 function AnalyticsIdentitySync() {
@@ -183,6 +217,12 @@ function AuthGate() {
     enabled: !isAppLoading && pendingRedirect === null,
     segments: routeSegments
   });
+  usePendingOneLinkRouting({
+    enabled:
+      auth.status === "authenticated" &&
+      (onboarding.status === "complete" || onboarding.status === "skipped"),
+    router
+  });
 
   useEffect(() => {
     if (!pendingRedirect) {
@@ -212,6 +252,76 @@ function AuthGate() {
       <StatusBar style="dark" />
     </>
   );
+}
+
+function usePendingOneLinkRouting({
+  enabled,
+  router
+}: {
+  enabled: boolean;
+  router: ReturnType<typeof useRouter>;
+}) {
+  useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
+
+    let active = true;
+    let consuming = false;
+
+    async function consume() {
+      if (consuming) {
+        return;
+      }
+
+      consuming = true;
+      const received = await takePendingDeepLink().finally(() => {
+        consuming = false;
+      });
+
+      if (!active || !received) {
+        return;
+      }
+
+      const destination = getDeepLinkDestination(received.intent);
+      await trackAction(ANALYTICS_EVENTS.DEEP_LINK_OPEN, {
+        deferred: received.deferred,
+        destination: received.intent.kind,
+        result: "success"
+      });
+      router.replace(destination as never);
+    }
+
+    void consume();
+    const unsubscribe = subscribeToPendingDeepLinks(() => {
+      void consume();
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [enabled, router]);
+}
+
+function getDeepLinkDestination(intent: DeepLinkIntent) {
+  switch (intent.kind) {
+    case "scan":
+      return {
+        pathname: "/(auth)/(tabs)/scan",
+        params: { mode: intent.mode }
+      };
+    case "premium":
+      return {
+        pathname: "/(auth)/premium",
+        params: { source: "deep_link" }
+      };
+    case "activation":
+      return "/(auth)/onboarding/activation";
+    case "home":
+    default:
+      return "/(auth)/(tabs)/home";
+  }
 }
 
 function getAnalyticsAuthProvider(user: ReturnType<typeof useAuth>["user"]) {

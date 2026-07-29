@@ -81,20 +81,22 @@ for (const credentials of [appleCredentials, googleCredentials]) {
   test(`uses normal ${credentials.provider} sign-in when no session exists`, async () => {
     const { auth, calls, credentialsSeen } = createAuthClient();
 
-    await completeNativeIdentitySignIn(auth, credentials);
+    const result = await completeNativeIdentitySignIn(auth, credentials);
 
     assert.deepEqual(calls, ["getSession", "signInWithIdToken"]);
     assert.deepEqual(credentialsSeen, [credentials]);
+    assert.equal(result, "returning");
   });
 }
 
 test("links a provider identity when the current session is anonymous", async () => {
   const { auth, calls, credentialsSeen } = createAuthClient({ currentAnonymous: true });
 
-  await completeNativeIdentitySignIn(auth, googleCredentials);
+  const result = await completeNativeIdentitySignIn(auth, googleCredentials);
 
   assert.deepEqual(calls, ["getSession", "linkIdentity"]);
   assert.deepEqual(credentialsSeen, [googleCredentials]);
+  assert.equal(result, "created");
 });
 
 test("signs into an existing account when anonymous identity linking conflicts", async () => {
@@ -103,9 +105,10 @@ test("signs into an existing account when anonymous identity linking conflicts",
   });
   const { auth, calls } = createAuthClient({ currentAnonymous: true, linkError: conflict });
 
-  await completeNativeIdentitySignIn(auth, appleCredentials);
+  const result = await completeNativeIdentitySignIn(auth, appleCredentials);
 
   assert.deepEqual(calls, ["getSession", "linkIdentity", "signInWithIdToken"]);
+  assert.equal(result, "returning");
 });
 
 test("surfaces unexpected identity-linking errors", async () => {

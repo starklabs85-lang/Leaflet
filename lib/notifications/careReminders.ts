@@ -8,6 +8,10 @@ import { secureStorageAdapter } from "@/lib/secure-storage";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { CareTaskType } from "@/types/careSchedule";
 import type { Database } from "@/types/database";
+import {
+  ANALYTICS_EVENTS,
+  trackAction
+} from "@/lib/analytics/firebaseAnalytics";
 
 type CareTaskRow = Pick<
   Database["public"]["Tables"]["care_tasks"]["Row"],
@@ -625,6 +629,13 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
 
   if (data.kind === "weather_alert") {
     lastHandledNotificationId = notificationId;
+    void trackAction(ANALYTICS_EVENTS.NOTIFICATION_OPEN, {
+      destination:
+        typeof data.userPlantId === "string" && data.userPlantId
+          ? "plant"
+          : "home",
+      source: "local_weather"
+    });
 
     if (typeof data.userPlantId === "string" && data.userPlantId) {
       router.push({
@@ -643,6 +654,10 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
   }
 
   lastHandledNotificationId = notificationId;
+  void trackAction(ANALYTICS_EVENTS.NOTIFICATION_OPEN, {
+    destination: "plant",
+    source: "local_care"
+  });
   router.push({
     pathname: "/(auth)/plants/[plantId]" as never,
     params: { plantId: data.userPlantId }

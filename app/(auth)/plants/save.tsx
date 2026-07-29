@@ -310,6 +310,11 @@ function PremiumSavePlantScreen() {
         shouldShowTrialIntro()
       ]);
 
+      if (collectionCount === 1) {
+        void trackAction(ANALYTICS_EVENTS.FIRST_PLANT_SAVED, {
+          source: "plant_save"
+        });
+      }
       showTrialIntro = collectionCount === 1 && introUnseen && !isPremium;
     } catch {
       showTrialIntro = false;

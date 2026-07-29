@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { runAccountDeletionServerFlow } from "./flow.ts";
 
 type StorageEntry = {
   id: string | null;
@@ -139,6 +140,83 @@ async function deleteUserStorageFolders(adminClient: SupabaseClient, userId: str
   }
 }
 
+function normalizeAppsFlyerUid(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length <= 200 && /^[A-Za-z0-9._:-]+$/.test(trimmed)
+    ? trimmed
+    : null;
+}
+
+async function ensureErasureRequestHeld(
+  adminClient: SupabaseClient,
+  userId: string,
+  appsflyerUid: string | null
+) {
+  const { data: existing, error: readError } = await adminClient
+    .from("appsflyer_erasure_requests")
+    .select("id, appsflyer_uid")
+    .eq("customer_user_id", userId)
+    .maybeSingle();
+
+  if (readError) {
+    throw new Error(`queue_create_failed:${readError.message}`);
+  }
+
+  if (existing) {
+    if (!existing.appsflyer_uid && appsflyerUid) {
+      const { error } = await adminClient
+        .from("appsflyer_erasure_requests")
+        .update({ appsflyer_uid: appsflyerUid })
+        .eq("id", existing.id);
+
+      if (error) {
+        throw new Error(`queue_create_failed:${error.message}`);
+      }
+    }
+
+    return existing.id as string;
+  }
+
+  const { data, error } = await adminClient
+    .from("appsflyer_erasure_requests")
+    .insert({
+      appsflyer_uid: appsflyerUid,
+      customer_user_id: userId,
+      status: "held"
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new Error(`queue_create_failed:${error?.message ?? "no row returned"}`);
+  }
+
+  return data.id as string;
+}
+
+async function releaseErasureRequest(
+  adminClient: SupabaseClient,
+  requestId: string
+) {
+  const { error } = await adminClient
+    .from("appsflyer_erasure_requests")
+    .update({
+      next_attempt_at: new Date().toISOString(),
+      status: "queued"
+    })
+    .eq("id", requestId)
+    .eq("status", "held");
+
+  if (error) {
+    throw new Error(`queue_release_failed:${error.message}`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -216,55 +294,68 @@ Deno.serve(async (req) => {
     );
   }
 
-  try {
-    await deleteUserStorageFolders(adminClient, user.id);
-  } catch (error) {
-    console.error("delete-account storage cleanup failed", {
-      message: error instanceof Error ? error.message : String(error),
-      userId: user.id
-    });
+  const body = await req.json().catch(() => ({}));
+  const appsflyerUid = normalizeAppsFlyerUid(
+    body && typeof body === "object"
+      ? (body as Record<string, unknown>).appsflyerUid
+      : null
+  );
+  let erasureRequestId = "";
 
-    return jsonResponse(
-      {
-        ok: false,
-        error: {
-          code: "storage_cleanup_failed",
-          message: "Your account could not be deleted because saved files could not be removed."
+  try {
+    await runAccountDeletionServerFlow({
+      enqueueErasureHeld: async () => {
+        erasureRequestId = await ensureErasureRequestHeld(
+          adminClient,
+          user.id,
+          appsflyerUid
+        );
+      },
+      deleteStorage: () => deleteUserStorageFolders(adminClient, user.id),
+      releaseErasure: () =>
+        releaseErasureRequest(adminClient, erasureRequestId),
+      revokeSessions: async () => {
+        const { error } = await adminClient.auth.admin.signOut(token, "global");
+
+        if (error) {
+          console.warn("delete-account session revoke failed", {
+            message: error.message
+          });
         }
       },
-      500
-    );
-  }
+      deleteUser: async () => {
+        const { error } = await adminClient.auth.admin.deleteUser(
+          user.id,
+          false
+        );
 
-  const { error: signOutError } = await adminClient.auth.admin.signOut(
-    token,
-    "global"
-  );
-
-  if (signOutError) {
-    console.warn("delete-account session revoke failed", {
-      message: signOutError.message,
-      userId: user.id
+        if (error) {
+          throw new Error(`delete_user_failed:${error.message}`);
+        }
+      }
     });
-  }
-
-  const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(
-    user.id,
-    false
-  );
-
-  if (deleteUserError) {
-    console.error("delete-account auth user deletion failed", {
-      message: deleteUserError.message,
-      userId: user.id
-    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const code = message.startsWith("queue_create_failed")
+      ? "erasure_queue_failed"
+      : message.startsWith("queue_release_failed")
+        ? "erasure_queue_release_failed"
+        : message.startsWith("delete_user_failed")
+          ? "delete_user_failed"
+          : "storage_cleanup_failed";
+    const publicMessage =
+      code === "storage_cleanup_failed"
+        ? "Your account could not be deleted because saved files could not be removed."
+        : code === "delete_user_failed"
+          ? "Your account could not be deleted. Please try again."
+          : "Your privacy deletion request could not be secured. Please try again.";
 
     return jsonResponse(
       {
         ok: false,
         error: {
-          code: "delete_user_failed",
-          message: "Your account could not be deleted. Please try again."
+          code,
+          message: publicMessage
         }
       },
       500

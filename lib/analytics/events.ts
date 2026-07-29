@@ -1,3 +1,5 @@
+import { GENERATED_EVENT_DEFINITIONS } from "./events.generated";
+
 export const ANALYTICS_EVENTS = {
   ACCOUNT_DELETE_PROMPT: "account_delete_prompt",
   ACCOUNT_DELETE_RESULT: "account_delete_result",
@@ -9,6 +11,8 @@ export const ANALYTICS_EVENTS = {
   DIAGNOSIS_ATTACH_SELECT: "diagnosis_attach_select",
   DIAGNOSIS_EXPAND: "diagnosis_expand",
   DIAGNOSIS_SAVE_RESULT: "diagnosis_save_result",
+  DEEP_LINK_OPEN: "deep_link_open",
+  FIRST_PLANT_SAVED: "first_plant_saved",
   FREE_LIMIT_HIT: "free_limit_hit",
   FROST_ALERT_TOGGLE: "frost_alert_toggle",
   GROWTH_PHOTO_ADD: "growth_photo_add",
@@ -19,6 +23,7 @@ export const ANALYTICS_EVENTS = {
   OFFER_CODE_REDEMPTION: "offer_code_redemption",
   ONBOARDING_COMPLETE: "onboarding_complete",
   ONBOARDING_SKIP: "onboarding_skip",
+  NOTIFICATION_OPEN: "notification_open",
   PAYWALL_VIEW: "paywall_view",
   PHOTO_CAPTURE: "photo_capture",
   PHOTO_PICK: "photo_pick",
@@ -38,6 +43,8 @@ export const ANALYTICS_EVENTS = {
   SCAN_SUBMIT: "scan_submit",
   SIGN_IN_CANCEL: "sign_in_cancel",
   SIGN_IN_FAILURE: "sign_in_failure",
+  PERMANENT_ACCOUNT_CREATED: "permanent_account_created",
+  RETURNING_SIGN_IN: "returning_sign_in",
   SIGN_IN_RESULT: "sign_in_result",
   SIGN_IN_TAP: "sign_in_tap",
   SIGN_OUT: "sign_out",
@@ -55,6 +62,7 @@ export const ANALYTICS_TAPS = {
   LEGAL_PRIVACY_LINK: "legal_privacy_link",
   LEGAL_TERMS_LINK: "legal_terms_link",
   PREMIUM_MANAGE_SUBSCRIPTION: "premium_manage_subscription",
+  PROFILE_PRIVACY_CHOICES: "profile_privacy_choices",
   SIGN_IN_APPLE_BUTTON: "sign_in_apple_button",
   SIGN_IN_GOOGLE_BUTTON: "sign_in_google_button"
 } as const;
@@ -90,6 +98,27 @@ export type AnalyticsUserProperties = Partial<
 >;
 export type SanitizedAnalyticsParams = Record<string, boolean | number | string>;
 export type SanitizedAnalyticsUserProperties = Record<string, string | null>;
+
+export type AnalyticsParameterType = "boolean" | "number" | "string";
+export type AnalyticsPrivacyClass = "product_analytics";
+export type AnalyticsEventDefinition = {
+  description: string;
+  trigger: string;
+  semantics: string;
+  parameters: Record<string, AnalyticsParameterType>;
+  privacy: AnalyticsPrivacyClass;
+  routes: {
+    appsFlyer: boolean;
+    firebase: boolean;
+  };
+  appsFlyerAlias?: string;
+  aliasWhen?: {
+    parameter: string;
+    equals: boolean | number | string;
+  };
+  conversionPriority: "none" | "low" | "medium" | "high";
+  partnerPostbackEligible: boolean;
+};
 
 const MAX_EVENT_NAME_LENGTH = 40;
 const MAX_PARAM_NAME_LENGTH = 40;
@@ -147,6 +176,217 @@ const SENSITIVE_PARAM_KEYS = new Set([
   "url",
   "uri"
 ]);
+
+const STRING = "string" as const;
+const BOOLEAN = "boolean" as const;
+const NUMBER = "number" as const;
+
+const EVENT_PARAMETERS: Partial<
+  Record<AnalyticsEventName, Record<string, AnalyticsParameterType>>
+> = {
+  account_delete_prompt: { source: STRING },
+  account_delete_result: { reason: STRING, result: STRING },
+  alternate_selected: { alternate_rank: NUMBER, selected: BOOLEAN },
+  camera_permission_result: { result: STRING, source: STRING },
+  care_log_result: { reason: STRING, result: STRING, type: STRING },
+  care_reminder_toggle: {
+    enabled: BOOLEAN,
+    result: STRING,
+    source: STRING
+  },
+  deep_link_open: {
+    deferred: BOOLEAN,
+    destination: STRING,
+    result: STRING
+  },
+  diagnose_result: { reason: STRING, result: STRING, stage: STRING },
+  diagnosis_attach_select: { source: STRING },
+  diagnosis_expand: { expanded: BOOLEAN },
+  diagnosis_save_result: {
+    attached_to_plant: BOOLEAN,
+    reason: STRING,
+    result: STRING,
+    target: STRING
+  },
+  first_plant_saved: { source: STRING },
+  free_limit_hit: { mode: STRING, reason: STRING, stage: STRING },
+  frost_alert_toggle: { enabled: BOOLEAN, result: STRING },
+  growth_photo_add: { reason: STRING, result: STRING, source: STRING },
+  identify_result: {
+    has_species_profile: BOOLEAN,
+    reason: STRING,
+    result: STRING
+  },
+  legal_link_tap: { surface: STRING, target: STRING },
+  library_permission_result: { result: STRING, source: STRING },
+  manage_subscription_link: { source: STRING },
+  notification_open: { destination: STRING, source: STRING },
+  offer_code_redemption: { result: STRING, source: STRING },
+  onboarding_complete: { method: STRING },
+  paywall_view: { premium_status: STRING, source: STRING },
+  permanent_account_created: { provider: STRING },
+  photo_capture: { mode: STRING, reason: STRING, result: STRING },
+  photo_pick: { mode: STRING, reason: STRING, result: STRING },
+  plan_select: { plan: STRING, source: STRING },
+  plant_delete_prompt: { source: STRING },
+  plant_delete_result: { reason: STRING, result: STRING },
+  plant_photo_replacement: {
+    reason: STRING,
+    result: STRING,
+    source: STRING,
+    surface: STRING
+  },
+  plant_save_result: { reason: STRING, result: STRING },
+  plant_update_result: {
+    changed_photo: BOOLEAN,
+    reason: STRING,
+    result: STRING
+  },
+  premium_cta: { reason: STRING, source: STRING },
+  purchase_result: { plan: STRING, result: STRING, source: STRING },
+  purchase_start: {
+    plan: STRING,
+    source: STRING,
+    trial_eligible: BOOLEAN
+  },
+  restore_result: { result: STRING, source: STRING },
+  restore_start: { source: STRING },
+  returning_sign_in: { provider: STRING },
+  scan_again: { from_step: STRING, mode: STRING },
+  scan_mode_change: { from_mode: STRING, source: STRING, to_mode: STRING },
+  scan_submit: { has_plant_context: BOOLEAN, mode: STRING },
+  sign_in_cancel: { provider: STRING },
+  sign_in_failure: { provider: STRING, reason: STRING },
+  sign_in_result: { provider: STRING, result: STRING },
+  sign_in_tap: { provider: STRING },
+  sign_out: { result: STRING },
+  task_interval_update: {
+    interval_days: NUMBER,
+    reason: STRING,
+    result: STRING,
+    task_type: STRING
+  },
+  task_toggle: {
+    enabled: BOOLEAN,
+    reason: STRING,
+    result: STRING,
+    task_type: STRING
+  },
+  today_task_complete: {
+    reason: STRING,
+    result: STRING,
+    source: STRING,
+    task_type: STRING
+  },
+  ui_tap: {
+    control_name: STRING,
+    reason: STRING,
+    source: STRING,
+    surface: STRING
+  },
+  weather_location_remove: { result: STRING },
+  weather_location_set: { reason: STRING, result: STRING, source: STRING },
+  weather_tip_action: {
+    action_kind: STRING,
+    days: NUMBER,
+    result: STRING
+  }
+};
+
+const APPSFLYER_ALIASES: Partial<
+  Record<
+    AnalyticsEventName,
+    Pick<AnalyticsEventDefinition, "appsFlyerAlias" | "aliasWhen">
+  >
+> = {
+  identify_result: {
+    appsFlyerAlias: "af_search",
+    aliasWhen: { parameter: "result", equals: "success" }
+  },
+  notification_open: {
+    appsFlyerAlias: "af_opened_from_push_notification"
+  },
+  onboarding_complete: {
+    appsFlyerAlias: "af_tutorial_completion"
+  },
+  paywall_view: {
+    appsFlyerAlias: "af_content_view"
+  },
+  permanent_account_created: {
+    appsFlyerAlias: "af_complete_registration"
+  },
+  purchase_start: {
+    appsFlyerAlias: "af_initiated_checkout"
+  },
+  returning_sign_in: {
+    appsFlyerAlias: "af_login"
+  }
+};
+
+const HIGH_PRIORITY_EVENTS = new Set<AnalyticsEventName>([
+  "first_plant_saved",
+  "identify_result",
+  "onboarding_complete",
+  "paywall_view",
+  "permanent_account_created",
+  "purchase_result",
+  "purchase_start",
+  "returning_sign_in"
+]);
+
+export const ANALYTICS_EVENT_CATALOG =
+  GENERATED_EVENT_DEFINITIONS as unknown as Record<
+    AnalyticsEventName,
+    AnalyticsEventDefinition
+  >;
+
+export function resolveAppsFlyerEventName(
+  eventName: AnalyticsEventName,
+  params: SanitizedAnalyticsParams
+) {
+  const definition = ANALYTICS_EVENT_CATALOG[eventName];
+  const alias = definition.appsFlyerAlias;
+
+  if (!alias) {
+    return eventName;
+  }
+
+  if (!definition.aliasWhen) {
+    return alias;
+  }
+
+  return params[definition.aliasWhen.parameter] === definition.aliasWhen.equals
+    ? alias
+    : eventName;
+}
+
+export function sanitizeDeclaredAnalyticsParams(
+  eventName: AnalyticsEventName,
+  params: AnalyticsParams | null | undefined
+) {
+  const sanitized = sanitizeAnalyticsParams(params);
+  const allowed = ANALYTICS_EVENT_CATALOG[eventName].parameters;
+
+  return Object.fromEntries(
+    Object.entries(sanitized).filter(([key, value]) => {
+      const expectedType = allowed[key];
+      const keep = Boolean(expectedType && typeof value === expectedType);
+
+      if (
+        !keep &&
+        typeof __DEV__ !== "undefined" &&
+        __DEV__ &&
+        !isSensitiveKey(key)
+      ) {
+        console.warn(
+          `Analytics parameter "${key}" is not declared for "${eventName}" and was dropped.`
+        );
+      }
+
+      return keep;
+    })
+  );
+}
 
 export function sanitizeAnalyticsEventName(name: string) {
   return sanitizeAnalyticsName(name, MAX_EVENT_NAME_LENGTH);

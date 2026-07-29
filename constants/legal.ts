@@ -1,4 +1,4 @@
-export const LEGAL_LAST_UPDATED = "June 30, 2026";
+export const LEGAL_LAST_UPDATED = "July 29, 2026";
 export const STANDARD_EULA_URL =
   "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 
@@ -22,17 +22,32 @@ export const PRIVACY_POLICY_SECTIONS = [
   {
     title: "Storage and service providers",
     body:
-      "Fernly stores app data, uploaded plant photos, and subscription-related access records with service providers needed to operate the app. Fernly does not sell personal data to third parties."
+      "Fernly stores app data and uploaded plant photos with Supabase, processes subscription access and lifecycle events with RevenueCat, manages privacy choices with Usercentrics, and uses Firebase and AppsFlyer for consented measurement and attribution. These providers process data only to operate, secure, measure, and improve Fernly. Fernly does not sell personal data."
   },
   {
-    title: "Analytics and diagnostics",
+    title: "Measurement and attribution",
     body:
-      "Fernly uses Firebase/Google Analytics in iOS builds to understand product interaction events, screen views, subscription flow outcomes, and aggregate app diagnostics. Analytics uses a pseudonymous Supabase user ID plus non-PII properties such as premium status, sign-in provider, onboarding status, platform, reminder status, weather-location source, and coarse count buckets. Fernly does not send emails, names, photo URIs, plant names, exact location, prompt text, or raw error text to analytics, and Firebase is configured without Ad ID support. Aggregate analytics are retained according to the Firebase/Google Analytics retention settings used for the project."
+      "With your measurement consent, Fernly uses Firebase/Google Analytics and AppsFlyer to understand screen views, product milestones, campaign attribution, and subscription funnel outcomes. Fernly may use a pseudonymous Supabase user ID, an AppsFlyer installation ID, Apple’s vendor identifier (IDFV), IP-derived attribution signals, premium status, sign-in provider, onboarding status, platform, reminder status, weather-location source, and coarse count buckets. Fernly does not request App Tracking Transparency permission, collect IDFA, or send emails, names, photo contents or URIs, plant or species names, exact location, prompts, URLs, or raw errors to analytics."
+  },
+  {
+    title: "Privacy choices and partner sharing",
+    body:
+      "Usercentrics presents privacy choices where required. Firebase and AppsFlyer start only after measurement consent; rejected events are not buffered or replayed. You can change or withdraw your choice at any time from Profile > Privacy choices. Withdrawal stops future analytics collection and AppsFlyer partner sharing. Advertising partners receive only consent-permitted install and selected conversion or subscription lifecycle postbacks; Fernly does not create IDFA-dependent audiences."
+  },
+  {
+    title: "Subscription measurement",
+    body:
+      "RevenueCat is Fernly’s source for subscription lifecycle and gross subscription revenue reporting to AppsFlyer, including trials, initial subscriptions, renewals, cancellations, billing issues, expirations, product changes, and refunds. Client-side purchase events contain funnel status only and do not include revenue values."
+  },
+  {
+    title: "Retention",
+    body:
+      "Fernly retains operational account data while your account is active and as needed for service, security, tax, and legal obligations. Analytics and attribution data follow the configured Firebase, AppsFlyer, RevenueCat, and export retention periods. Where licensed, raw attribution exports are scheduled for deletion after 400 days and aggregate campaign and cost data after 25 months. Final retention settings are subject to provider availability and legal review."
   },
   {
     title: "User control and deletion",
     body:
-      "You can delete plants from your collection in the app and permanently delete your account from Profile. Account deletion removes your user data and cannot be restored."
+      "You can delete plants from your collection and permanently delete your account from Profile. Before the Supabase account is removed, Fernly durably queues an AppsFlyer erasure request using pseudonymous provider identifiers. Provider delivery and completion continue asynchronously, are retried, and the stored provider identifiers are erased after completion. Deleting a Fernly account does not cancel an App Store subscription."
   },
   {
     title: "AI limitations",
