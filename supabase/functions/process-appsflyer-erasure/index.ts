@@ -39,6 +39,37 @@ function nextAttemptDate(attemptCount: number) {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
 
+type ServiceRoleClaims = {
+  ref?: unknown;
+  role?: unknown;
+};
+
+/**
+ * `verify_jwt = true` validates the signature before this handler runs. This
+ * check narrows that trusted token to Fernly's service role without coupling
+ * the scheduler to the exact value of a rotatable legacy service-role JWT.
+ */
+function isFernlyServiceRoleRequest(req: Request, supabaseUrl: string) {
+  const authorization = req.headers.get("Authorization");
+  const token = authorization?.match(/^Bearer ([^.]+\.[^.]+\.[^.]+)$/)?.[1];
+
+  if (!token) {
+    return false;
+  }
+
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const claims = JSON.parse(atob(padded)) as ServiceRoleClaims;
+    const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+
+    return claims.role === "service_role" && claims.ref === projectRef;
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
@@ -48,11 +79,10 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const appsFlyerToken =
     Deno.env.get("APPSFLYER_OPENDSR_API_TOKEN") ?? "";
-  const authorization = req.headers.get("Authorization");
 
   if (
     !serviceRoleKey ||
-    authorization !== `Bearer ${serviceRoleKey}`
+    !isFernlyServiceRoleRequest(req, supabaseUrl)
   ) {
     return jsonResponse({ ok: false, error: "unauthorized" }, 401);
   }
