@@ -3,15 +3,18 @@
 App: Fernly (`id6775880316`)
 Bundle ID: `com.countrybean.leaflet`
 Scope: iOS, global including EEA/UK, no ATT prompt, no IDFA
-Last live audit: July 29, 2026
+Last live audit: July 30, 2026
 
 ## Connected systems and verified starting state
 
-- Fernly Supabase MCP is connected to project `gnrjqqoidzuwzvhhfggh`; local `supabase/config.toml` matches.
+- Fernly production Supabase project is `gnrjqqoidzuwzvhhfggh`; local `supabase/config.toml` matches.
 - RevenueCat MCP is connected to Fernly project `proj5d66023c`, iOS app `app223a460466`.
 - RevenueCat already has the `Supabase subscriptions sync` webhook (`whintgr32f9f192df`) for initial purchase, renewal, product change, cancellation, billing issue, uncancellation, transfer, expiration, and subscription extension.
 - AppsFlyer Fernly app is active with Advanced Privacy and probabilistic modeling enabled.
-- AppsFlyer live audit found no in-app events, OneLink templates, active cost integrations, ad-revenue integrations, APNs certificate, or re-engagement configuration.
+- AppsFlyer has the `redirection_profile` OneLink template (`cSib`) on
+  `fernly.onelink.me`, including five verified MMP test links. The live audit
+  still found no in-app events, active cost integrations, ad-revenue
+  integrations, APNs certificate, or re-engagement configuration.
 - RevenueCat SDK feature-gate inspection is unavailable to the connected MCP token (`project_configuration:sdk_compatibility:read` is missing). The AppsFlyer attribution integration is not exposed by the RevenueCat MCP.
 
 Dashboard-only changes below remain release blockers until an operator records the owner, account, selected postbacks, windows, and verification date.
@@ -59,7 +62,9 @@ privacy and partner-policy review.
 
 ## OneLink
 
-Create one hosted OneLink template and set its host/template ID in the build environment. The app accepts only:
+The hosted `redirection_profile` template uses ID `cSib`, the
+`fernly.onelink.me` domain, and iOS Universal Links for `id6775880316`. The
+host and template ID are set in every EAS build profile. The app accepts only:
 
 ```text
 deep_link_value=home
@@ -70,6 +75,16 @@ deep_link_value=activation
 ```
 
 The OneLink domain must be an HTTPS `*.onelink.me` hostname. Expo adds it as `applinks:<host>`. Unknown values, URLs, routes, oversized values, and invalid scan modes fall back to home. Fernly persists only the parsed intent plus direct/deferred state, consumes it once after authentication/onboarding, and expires it after 24 hours.
+
+Verified test links:
+
+```text
+https://fernly.onelink.me/cSib/test_home
+https://fernly.onelink.me/cSib/test_scan_identify
+https://fernly.onelink.me/cSib/test_scan_diagnose
+https://fernly.onelink.me/cSib/test_premium
+https://fernly.onelink.me/cSib/test_activation
+```
 
 ## RevenueCat to AppsFlyer
 
@@ -137,29 +152,23 @@ Live paid attribution and cost reconciliation remain unverified until an authori
 
 Account deletion creates a held `appsflyer_erasure_requests` row before any destructive step, releases it only after storage cleanup, and requires release before deleting the Supabase user. The worker uses AppsFlyer’s official OpenDSR endpoint and one identity per request, preferring AppsFlyer UID and falling back to the Supabase CUID. Completed rows erase both provider identifiers.
 
-### Production deployment blocker found July 29, 2026
+### Production deployment status verified July 30, 2026
 
-The migration and both Edge Functions are implemented locally but are not
-deployed. The linked Supabase project has pre-existing migration-history drift:
+- Migration history was reconciled before deploying the OpenDSR changes.
+- `20260729151039_appsflyer_opendsr_queue.sql` and
+  `20260730064939_appsflyer_erasure_worker_schedule.sql` are deployed.
+- `delete-account` and `process-appsflyer-erasure` are deployed with the worker
+  authorization fix.
+- `APPSFLYER_OPENDSR_API_TOKEN` is set as an Edge Function secret.
+- `appsflyer_erasure_worker_service_role` is stored in Supabase Vault.
+- `process-appsflyer-erasure-hourly` runs at minute 07 of every hour.
+- A controlled empty-queue invocation returned HTTP 200.
 
-- remote-only: `20260530121400`, `20260530121607`, `20260530141759`
-- local-only: `20260530154500`, `20260530163230`, `20260530164010`
-
-`supabase db push --dry-run` refuses the new migration unless `--include-all`
-is used. Do not force that flag: the older local migrations contain
-non-idempotent schema creation and may duplicate production objects. Repair or
-reconcile the migration history first, rerun the dry-run, then deploy the
-OpenDSR migration and functions together. Until that is complete, do not deploy
-the modified `delete-account` function because it deliberately requires the
-queue table before deleting a user.
-
-After deploying the migration and functions:
-
-1. Set `APPSFLYER_OPENDSR_API_TOKEN` with Supabase secret management.
-2. Schedule `process-appsflyer-erasure` at least hourly using a service-role-authenticated invocation stored in Supabase Vault.
-3. Alert on `appsflyer_opendsr_deadline_at_risk`.
-4. Alert on rows in `failed`, retries that stop advancing, and any incomplete row within 24 hours of `deadline_at`.
-5. Test with AppsFlyer’s stub API before production. Change the endpoint only in a controlled test build/function revision; never send test identifiers to production.
+Continue to alert on `appsflyer_opendsr_deadline_at_risk`, rows in `failed`,
+retries that stop advancing, and any incomplete row within 24 hours of
+`deadline_at`. Use AppsFlyer's stub API for destructive-flow testing; change
+the endpoint only in a controlled function revision and never send test
+identifiers to production.
 
 ## Data Locker and retention
 
