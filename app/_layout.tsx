@@ -17,6 +17,7 @@ import {
 } from "@expo-google-fonts/nunito";
 
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { MeasurementConsentModal } from "@/components/measurement/MeasurementConsentModal";
 import { theme } from "@/constants/theme";
 import {
   clearAnalyticsUser,
@@ -121,6 +122,7 @@ function InstallationGate() {
         <OnboardingProvider>
           <PendingScanProvider>
             <ConnectivityProvider>
+              <MeasurementConsentModal />
               <MeasurementBootstrap />
               <AnalyticsIdentitySync />
               <AuthGate />

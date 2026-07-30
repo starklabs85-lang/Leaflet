@@ -6,6 +6,7 @@ import {
   analyticsTapManifest,
   analyticsUserPropertyManifest
 } from "../analytics/manifest";
+import { generatedOutputMatches } from "./generatedOutput";
 
 const root = path.resolve(__dirname, "..");
 const outputs = new Map<string, string>([
@@ -28,7 +29,7 @@ async function main() {
     if (check) {
       const current = await readFile(target, "utf8").catch(() => "");
 
-      if (current !== content) {
+      if (!generatedOutputMatches(current, content)) {
         stale = true;
         console.error(`Generated analytics output is stale: ${relativePath}`);
       }

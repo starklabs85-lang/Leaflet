@@ -27,16 +27,16 @@ import {
 } from "./appsFlyerAdapter";
 import { createFirebaseMeasurementAdapter } from "./firebaseAdapter";
 import {
-  createUsercentricsConsentAdapter,
-  type UsercentricsConsentAdapter
-} from "./usercentricsConsent";
+  createFirstPartyConsentAdapter,
+  type FirstPartyConsentAdapter
+} from "./firstPartyConsent";
 
 type MeasurementController = ReturnType<typeof createMeasurementController>;
 type AppsFlyerAdapter = ReturnType<typeof createAppsFlyerAdapter>;
 
 let controller: MeasurementController | null = null;
 let appsFlyerAdapter: AppsFlyerAdapter | null = null;
-let consentAdapter: UsercentricsConsentAdapter | null = null;
+let consentAdapter: FirstPartyConsentAdapter | null = null;
 let initializationPromise: Promise<MeasurementController | null> | null = null;
 let pendingUser: {
   id: string;
@@ -57,18 +57,17 @@ async function prepareController() {
       return null;
     }
 
-    const sdk = await loadAppsFlyerSdk();
+    const loadedAppsFlyer = await loadAppsFlyerSdk();
     appsFlyerAdapter = createAppsFlyerAdapter({
       appId: env.appsFlyerIosAppId,
+      createConsentData: loadedAppsFlyer.createConsentData,
       devKey: env.appsFlyerDevKey,
       getCustomerUserId: () => pendingUser?.id ?? null,
       isDebug: __DEV__,
       onDeepLinkIntent: storePendingDeepLink,
-      sdk
+      sdk: loadedAppsFlyer.sdk
     });
-    consentAdapter = createUsercentricsConsentAdapter(
-      env.usercentricsSettingsId
-    );
+    consentAdapter = createFirstPartyConsentAdapter();
     controller = createMeasurementController({
       appsFlyer: appsFlyerAdapter,
       consent: consentAdapter,

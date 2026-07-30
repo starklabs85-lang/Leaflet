@@ -9,13 +9,15 @@ test("AppsFlyer subscribes to UDL before initialization and starts manually", as
 
   const adapter = createAppsFlyerAdapter({
     appId: "6775880316",
+    createConsentData: (consent) => consent,
     devKey: "dev-key",
     isDebug: false,
     onDeepLinkIntent: async () => undefined,
     sdk: {
       anonymizeUser: () => undefined,
       disableAdvertisingIdentifier: () => calls.push("disable-idfa"),
-      enableTCFDataCollection: () => calls.push("enable-tcf"),
+      enableTCFDataCollection: (enabled) =>
+        calls.push(`tcf:${String(enabled)}`),
       getAppsFlyerUID: () => undefined,
       initSdk: async (options) => {
         calls.push("init");
@@ -28,6 +30,8 @@ test("AppsFlyer subscribes to UDL before initialization and starts manually", as
         return () => undefined;
       },
       setCustomerUserId: () => undefined,
+      setConsentData: (consent) =>
+        calls.push(`consent:${JSON.stringify(consent)}`),
       setSharingFilterForPartners: () => undefined,
       startSdk: () => calls.push("start"),
       stop: () => undefined,
@@ -40,7 +44,8 @@ test("AppsFlyer subscribes to UDL before initialization and starts manually", as
   assert.deepEqual(calls, [
     "subscribe-udl",
     "disable-idfa",
-    "enable-tcf",
+    "tcf:false",
+    'consent:{"isUserSubjectToGDPR":true,"hasConsentForDataUsage":true,"hasConsentForAdsPersonalization":false,"hasConsentForAdStorage":true}',
     "init",
     "start"
   ]);
@@ -67,6 +72,7 @@ test("AppsFlyer persists only parsed deep-link intent metadata", async () => {
 
   const adapter = createAppsFlyerAdapter({
     appId: "6775880316",
+    createConsentData: (consent) => consent,
     devKey: "dev-key",
     isDebug: false,
     onDeepLinkIntent: async (intent) => {
@@ -84,6 +90,7 @@ test("AppsFlyer persists only parsed deep-link intent metadata", async () => {
         return () => undefined;
       },
       setCustomerUserId: () => undefined,
+      setConsentData: () => undefined,
       setSharingFilterForPartners: () => undefined,
       startSdk: () => undefined,
       stop: () => undefined,
@@ -117,6 +124,7 @@ test("AppsFlyer events never include client-side revenue values", async () => {
   const events: Array<{ name: string; params: Record<string, unknown> }> = [];
   const adapter = createAppsFlyerAdapter({
     appId: "6775880316",
+    createConsentData: (consent) => consent,
     devKey: "dev-key",
     isDebug: false,
     onDeepLinkIntent: async () => undefined,
@@ -132,6 +140,7 @@ test("AppsFlyer events never include client-side revenue values", async () => {
       },
       onDeepLink: () => () => undefined,
       setCustomerUserId: () => undefined,
+      setConsentData: () => undefined,
       setSharingFilterForPartners: () => undefined,
       startSdk: () => undefined,
       stop: () => undefined,
@@ -154,6 +163,7 @@ test("sets the Supabase CUID after consent but before the AppsFlyer start event"
   const calls: string[] = [];
   const adapter = createAppsFlyerAdapter({
     appId: "6775880316",
+    createConsentData: (consent) => consent,
     devKey: "dev-key",
     getCustomerUserId: () => "supabase-user-id",
     isDebug: false,
@@ -170,6 +180,7 @@ test("sets the Supabase CUID after consent but before the AppsFlyer start event"
       logEvent: async () => "ok",
       onDeepLink: () => () => undefined,
       setCustomerUserId: (value) => calls.push(`cuid:${value}`),
+      setConsentData: () => undefined,
       setSharingFilterForPartners: () => undefined,
       startSdk: () => calls.push("start"),
       stop: () => undefined,
@@ -180,4 +191,79 @@ test("sets the Supabase CUID after consent but before the AppsFlyer start event"
   await adapter.start();
 
   assert.deepEqual(calls, ["init", "cuid:supabase-user-id", "start"]);
+});
+
+test("withdrawal sends a denied manual consent signal before stopping AppsFlyer", async () => {
+  const calls: string[] = [];
+  const adapter = createAppsFlyerAdapter({
+    appId: "6775880316",
+    createConsentData: (consent) => consent,
+    devKey: "dev-key",
+    isDebug: false,
+    onDeepLinkIntent: async () => undefined,
+    sdk: {
+      anonymizeUser: () => undefined,
+      disableAdvertisingIdentifier: () => undefined,
+      enableTCFDataCollection: (enabled) =>
+        calls.push(`tcf:${String(enabled)}`),
+      getAppsFlyerUID: () => undefined,
+      initSdk: async () => "ok",
+      logEvent: async () => "ok",
+      onDeepLink: () => () => undefined,
+      setCustomerUserId: () => undefined,
+      setConsentData: (consent) =>
+        calls.push(`consent:${JSON.stringify(consent)}`),
+      setSharingFilterForPartners: (partners) =>
+        calls.push(`sharing:${partners.join(",")}`),
+      startSdk: () => undefined,
+      stop: (stopped) => calls.push(`stop:${String(stopped)}`),
+      updateServerUninstallToken: () => undefined
+    }
+  });
+
+  await adapter.disable();
+
+  assert.deepEqual(calls, [
+    "tcf:false",
+    'consent:{"isUserSubjectToGDPR":true,"hasConsentForDataUsage":false,"hasConsentForAdsPersonalization":false,"hasConsentForAdStorage":false}',
+    "sharing:all",
+    "stop:true"
+  ]);
+});
+
+test("re-consent refreshes the granted signal before restarting an initialized SDK", async () => {
+  const calls: string[] = [];
+  const adapter = createAppsFlyerAdapter({
+    appId: "6775880316",
+    createConsentData: (consent) => consent,
+    devKey: "dev-key",
+    isDebug: false,
+    onDeepLinkIntent: async () => undefined,
+    sdk: {
+      anonymizeUser: () => undefined,
+      disableAdvertisingIdentifier: () => undefined,
+      enableTCFDataCollection: () => undefined,
+      getAppsFlyerUID: () => undefined,
+      initSdk: async () => "ok",
+      logEvent: async () => "ok",
+      onDeepLink: () => () => undefined,
+      setCustomerUserId: () => undefined,
+      setConsentData: (consent) =>
+        calls.push(`consent:${JSON.stringify(consent)}`),
+      setSharingFilterForPartners: () => undefined,
+      startSdk: () => calls.push("start"),
+      stop: () => undefined,
+      updateServerUninstallToken: () => undefined
+    }
+  });
+
+  await adapter.start();
+  await adapter.disable();
+  calls.length = 0;
+  await adapter.start();
+
+  assert.deepEqual(calls, [
+    'consent:{"isUserSubjectToGDPR":true,"hasConsentForDataUsage":true,"hasConsentForAdsPersonalization":false,"hasConsentForAdStorage":true}',
+    "start"
+  ]);
 });

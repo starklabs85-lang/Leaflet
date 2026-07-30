@@ -25,7 +25,6 @@ EXPO_PUBLIC_APPSFLYER_DEV_KEY
 EXPO_PUBLIC_APPSFLYER_IOS_APP_ID=6775880316
 EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN
 EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID
-EXPO_PUBLIC_USERCENTRICS_SETTINGS_ID
 ```
 
 Server-only Supabase secrets:
@@ -36,16 +35,27 @@ APPSFLYER_OPENDSR_API_TOKEN
 
 The OpenDSR value is the AppsFlyer V2 API token and must never be used in the app or committed. Existing Supabase service-role credentials remain server-only.
 
-## Usercentrics
+## First-party measurement consent
 
-1. Create or select the mobile CMP settings for `com.countrybean.leaflet`.
-2. Enable global consent coverage including EEA/UK and IAB TCF.
-3. Add Firebase Analytics and AppsFlyer as non-essential measurement services.
-4. Ensure both services map to the same measurement decision used by Fernly.
-5. Publish settings and place only the public settings ID in the build environment.
-6. Validate accept, reject, reopen, withdraw, and re-consent on a physical iPhone.
+Fernly uses a built-in, globally displayed measurement choice rather than a
+paid CMP. It has one optional category covering Firebase Analytics and
+AppsFlyer attribution. Essential account, plant, AI, subscription, security,
+and deletion services do not depend on this choice.
 
-If Usercentrics cannot initialize, Fernly continues with analytics disabled.
+1. Show the choice before Firebase or AppsFlyer starts.
+2. Store the choice, policy version, and decision time on the installation.
+3. On acceptance, send AppsFlyer manual consent with data usage and storage
+   allowed, ad personalization denied, and GDPR treated as applicable.
+4. On rejection or withdrawal, keep Firebase disabled, stop AppsFlyer, block
+   AppsFlyer partner sharing, and keep RevenueCat's AppsFlyer sharing filter.
+5. Discard pre-consent events; never buffer or replay them.
+6. Allow withdrawal and re-consent from Profile > Privacy choices.
+7. Validate accept, reject, reopen, withdraw, policy-version re-prompt, and
+   re-consent on a physical iPhone.
+
+This implementation does not generate an IAB TCF string. Do not enable AdMob
+or other publisher advertising that requires a certified CMP without a fresh
+privacy and partner-policy review.
 
 ## OneLink
 

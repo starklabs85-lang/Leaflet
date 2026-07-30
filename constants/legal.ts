@@ -1,4 +1,4 @@
-export const LEGAL_LAST_UPDATED = "July 29, 2026";
+export const LEGAL_LAST_UPDATED = "July 30, 2026";
 export const STANDARD_EULA_URL =
   "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 
@@ -22,7 +22,7 @@ export const PRIVACY_POLICY_SECTIONS = [
   {
     title: "Storage and service providers",
     body:
-      "Fernly stores app data and uploaded plant photos with Supabase, processes subscription access and lifecycle events with RevenueCat, manages privacy choices with Usercentrics, and uses Firebase and AppsFlyer for consented measurement and attribution. These providers process data only to operate, secure, measure, and improve Fernly. Fernly does not sell personal data."
+      "Fernly stores app data and uploaded plant photos with Supabase, processes subscription access and lifecycle events with RevenueCat, and uses Firebase and AppsFlyer for optional measurement and attribution when you allow it. These providers process data only to operate, secure, measure, and improve Fernly. Fernly does not sell personal data."
   },
   {
     title: "Measurement and attribution",
@@ -32,7 +32,7 @@ export const PRIVACY_POLICY_SECTIONS = [
   {
     title: "Privacy choices and partner sharing",
     body:
-      "Usercentrics presents privacy choices where required. Firebase and AppsFlyer start only after measurement consent; rejected events are not buffered or replayed. You can change or withdraw your choice at any time from Profile > Privacy choices. Withdrawal stops future analytics collection and AppsFlyer partner sharing. Advertising partners receive only consent-permitted install and selected conversion or subscription lifecycle postbacks; Fernly does not create IDFA-dependent audiences."
+      "Fernly presents its optional measurement choice before Firebase or AppsFlyer starts. Your choice is stored on this installation with the policy version and decision time; rejected events are not buffered or replayed. You can change or withdraw your choice at any time from Profile > Privacy choices. Withdrawal stops future analytics collection and AppsFlyer partner sharing. Advertising partners receive only consent-permitted install and selected conversion or subscription lifecycle postbacks; Fernly does not create IDFA-dependent audiences or generate an IAB TCF consent string."
   },
   {
     title: "Subscription measurement",

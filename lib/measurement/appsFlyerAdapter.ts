@@ -33,14 +33,23 @@ type AppsFlyerSdk = {
     }) => void
   ) => () => void;
   setCustomerUserId: (userId: string) => void;
+  setConsentData: (consent: unknown) => void;
   setSharingFilterForPartners: (partners: string[]) => void;
   startSdk: () => void;
   stop: (stopped: boolean) => void;
   updateServerUninstallToken: (token: string) => void;
 };
 
+type ManualConsentData = {
+  isUserSubjectToGDPR: boolean;
+  hasConsentForDataUsage: boolean;
+  hasConsentForAdsPersonalization: boolean;
+  hasConsentForAdStorage: boolean;
+};
+
 type AppsFlyerAdapterOptions = {
   appId: string;
+  createConsentData: (consent: ManualConsentData) => unknown;
   devKey: string;
   getCustomerUserId?: () => string | null;
   isDebug: boolean;
@@ -61,6 +70,7 @@ const REVENUE_PARAMETER_KEYS = new Set([
 
 export function createAppsFlyerAdapter({
   appId,
+  createConsentData,
   devKey,
   getCustomerUserId = () => null,
   isDebug,
@@ -92,7 +102,19 @@ export function createAppsFlyerAdapter({
           }).catch(() => undefined);
         });
         sdk.disableAdvertisingIdentifier(true);
-        sdk.enableTCFDataCollection(true);
+        sdk.enableTCFDataCollection(false);
+      }
+
+      sdk.setConsentData(
+        createConsentData({
+          isUserSubjectToGDPR: true,
+          hasConsentForDataUsage: true,
+          hasConsentForAdsPersonalization: false,
+          hasConsentForAdStorage: true
+        })
+      );
+
+      if (!initialized) {
         await sdk.initSdk({
           appId,
           devKey,
@@ -116,6 +138,15 @@ export function createAppsFlyerAdapter({
     },
 
     async disable() {
+      sdk.enableTCFDataCollection(false);
+      sdk.setConsentData(
+        createConsentData({
+          isUserSubjectToGDPR: true,
+          hasConsentForDataUsage: false,
+          hasConsentForAdsPersonalization: false,
+          hasConsentForAdStorage: false
+        })
+      );
       sdk.setSharingFilterForPartners(["all"]);
       sdk.stop(true);
     },
@@ -162,7 +193,18 @@ export function createAppsFlyerAdapter({
   };
 }
 
-export async function loadAppsFlyerSdk(): Promise<AppsFlyerSdk> {
+export async function loadAppsFlyerSdk() {
   const imported = await import("react-native-appsflyer");
-  return imported.default as AppsFlyerSdk;
+  const Consent = imported.AppsFlyerConsent;
+
+  return {
+    createConsentData: (consent: ManualConsentData) =>
+      new Consent(
+        consent.isUserSubjectToGDPR,
+        consent.hasConsentForDataUsage,
+        consent.hasConsentForAdsPersonalization,
+        consent.hasConsentForAdStorage
+      ),
+    sdk: imported.default as AppsFlyerSdk
+  };
 }

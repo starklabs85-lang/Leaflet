@@ -122,8 +122,6 @@ const config: ExpoConfig = {
       process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN ?? "",
     appsFlyerOneLinkTemplateId:
       process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID ?? "",
-    usercentricsSettingsId:
-      process.env.EXPO_PUBLIC_USERCENTRICS_SETTINGS_ID ?? "",
     eas: {
       projectId: "63ea258d-3a71-4b3e-b43b-0d1d94baa969"
     }

@@ -25,7 +25,6 @@
     "@react-native-firebase/app": "^24.1.1",
     "@react-native-google-signin/google-signin": "^16.0.0",
     "@supabase/supabase-js": "^2.0.0",
-    "@usercentrics/react-native-sdk": "^2.28.2",
     "expo": "^54.0.0",
     "expo-apple-authentication": "~8.0.0",
     "expo-build-properties": "~1.0.10",

@@ -13,8 +13,6 @@ export const env = {
     process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN ?? "",
   appsFlyerOneLinkTemplateId:
     process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID ?? "",
-  usercentricsSettingsId:
-    process.env.EXPO_PUBLIC_USERCENTRICS_SETTINGS_ID ?? "",
   devTestEmail: process.env.EXPO_PUBLIC_DEV_TEST_EMAIL ?? "",
   devTestPassword: process.env.EXPO_PUBLIC_DEV_TEST_PASSWORD ?? ""
 };
@@ -96,7 +94,6 @@ export function getGoogleConfigIssue() {
 export function hasMeasurementConfig() {
   return Boolean(
     env.appsFlyerDevKey &&
-      env.appsFlyerIosAppId === "6775880316" &&
-      env.usercentricsSettingsId
+      env.appsFlyerIosAppId === "6775880316"
   );
 }

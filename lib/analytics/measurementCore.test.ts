@@ -142,7 +142,7 @@ test("centralized screen views route to both adapters after consent", async () =
   ]);
 });
 
-test("CMP failure keeps the app usable with measurement disabled", async () => {
+test("consent storage failure keeps the app usable with measurement disabled", async () => {
   const firebase = createAdapter();
   const appsFlyer = createAdapter();
   const controller = createMeasurementController({
@@ -150,7 +150,7 @@ test("CMP failure keeps the app usable with measurement disabled", async () => {
     consent: {
       applyConsent: async () => "denied",
       initialize: async () => {
-        throw new Error("CMP unavailable");
+        throw new Error("Consent storage unavailable");
       }
     },
     firebase: firebase.adapter,

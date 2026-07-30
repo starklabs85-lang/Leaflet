@@ -183,7 +183,7 @@ export default function ProfileScreen() {
       if (state === "misconfigured") {
         Alert.alert(
           "Privacy choices unavailable",
-          "Fernly could not load the privacy service. Analytics remains off."
+          "Fernly could not load privacy choices. Analytics remains off."
         );
       }
     } finally {

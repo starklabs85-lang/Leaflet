@@ -25,7 +25,10 @@ Do not declare Fernly as tracking users across other companies’ apps with IDFA
 
 ## Controls and retention
 
-- Usercentrics mobile CMP must be configured for `com.countrybean.leaflet`, global including EEA/UK, with TCF enabled.
+- Fernly presents one first-party optional measurement choice globally and
+  stores the decision, policy version, and decision time on the installation.
+- Fernly sends AppsFlyer manual DMA/GDPR consent fields and does not claim or
+  generate an IAB TCF string.
 - “Privacy choices” is available from Profile and withdrawal stops Firebase, AppsFlyer, partner sharing, and future RevenueCat attribution synchronization.
 - No pre-consent event is buffered or replayed.
 - Account deletion queues an AppsFlyer OpenDSR erasure before the Supabase user is deleted.
@@ -33,4 +36,8 @@ Do not declare Fernly as tracking users across other companies’ apps with IDFA
 
 ## Release gate
 
-Privacy/legal must review the in-app policy, provider DPAs, Usercentrics service definitions, retention values, partner postbacks, App Store privacy answers, and the no-ATT/no-IDFA claim before release.
+Privacy/legal must review the in-app consent copy, policy, provider DPAs,
+retention values, partner postbacks, App Store privacy answers, manual
+AppsFlyer consent mapping, and the no-ATT/no-IDFA claim before release. If
+Fernly later serves publisher advertising such as AdMob, reassess whether a
+certified CMP is required before enabling it.
