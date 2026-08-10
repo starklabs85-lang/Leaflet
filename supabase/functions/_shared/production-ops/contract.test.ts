@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { canonicalIncident, dedupeLabel } from "./canonical.ts";
+import { canonicalDigest, canonicalIncident, dedupeLabel } from "./canonical.ts";
 import { parseIncidentRequest } from "./contract.ts";
 
 const occurredAt = "2026-08-11T00:00:00.000Z";
@@ -149,5 +149,17 @@ test("creates only a Fernly 24-hex incident label", async () => {
     const label = await dedupeLabel(canonicalIncident(parsed.value));
     assert.match(label, /^fernly-incident-[a-f0-9]{24}$/);
     assert.equal(label, "fernly-incident-978b5cc1343b38f9a7fb1a99");
+  }
+});
+
+test("creates the full canonical digest used by replay state", async () => {
+  const parsed = parseIncidentRequest(request("identify_failed", "openai_unavailable"));
+  assert.equal(parsed.ok, true);
+
+  if (parsed.ok) {
+    assert.equal(
+      await canonicalDigest(canonicalIncident(parsed.value)),
+      "978b5cc1343b38f9a7fb1a991e30a6ffee4205511792009b55a8102261d0e3fb"
+    );
   }
 });

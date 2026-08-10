@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test:focused": "tsx --test lib/*.test.ts lib/analytics/*.test.ts lib/deepLinks/*.test.ts lib/measurement/*.test.ts lib/onboarding/*.test.ts lib/payments/*.test.ts",
-    "test:production-ops": "tsx --test supabase/functions/_shared/production-ops/*.test.ts",
+    "test:production-ops": "tsx --test supabase/functions/_shared/production-ops/*.test.ts supabase/functions/production-incident/*.test.ts",
     "analytics:generate": "tsx scripts/generate-analytics.ts",
     "analytics:check": "tsx scripts/generate-analytics.ts --check",
     "build:dev:ios": "eas build --profile development --platform ios",

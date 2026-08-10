@@ -4,6 +4,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { parseClientIncidentInput } from "../_shared/productionPaging.ts";
 import { reportTrustedProductionIncident } from "../_shared/productionPagingServer.ts";
+import {
+  reserveProductionIncident,
+  type PagingRpcClient
+} from "../_shared/production-ops/reservation.ts";
+import { handleProductionIncident } from "./handler.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +29,45 @@ function getBearerToken(req: Request) {
   return value?.startsWith("Bearer ") ? value.slice("Bearer ".length).trim() : null;
 }
 
+function isOperationsRequest(req: Request) {
+  return ["x-fernly-signature", "x-fernly-timestamp", "x-fernly-nonce"].some((name) =>
+    req.headers.has(name)
+  );
+}
+
 Deno.serve(async (req) => {
+  if (isOperationsRequest(req)) {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const operationsSecret = Deno.env.get("FERNLY_INCIDENT_HMAC_SECRET")?.trim() ?? "";
+
+    if (!supabaseUrl || !serviceRoleKey || !operationsSecret) {
+      return jsonResponse({ ok: false, code: "service_unavailable" }, 503);
+    }
+
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
+    });
+    const providerConfigured = Boolean(
+      Deno.env.get("FERNLY_PAGING_PROVIDER_URL")?.trim() &&
+        Deno.env.get("FERNLY_PAGING_PROVIDER_HMAC_SECRET")?.trim()
+    );
+    const jiraConfigured = Boolean(
+      Deno.env.get("FERNLY_JIRA_WEBHOOK_URL")?.trim() &&
+        Deno.env.get("FERNLY_JIRA_WEBHOOK_SECRET")?.trim()
+    );
+
+    return handleProductionIncident(req, {
+      now: () => new Date(),
+      operationsSecret,
+      reserve: (input) =>
+        reserveProductionIncident(adminClient as unknown as PagingRpcClient, input, {
+          providerConfigured,
+          jiraConfigured
+        })
+    });
+  }
+
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }

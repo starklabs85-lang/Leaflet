@@ -14,8 +14,12 @@ export function canonicalIncident(input: IncidentInput) {
 }
 
 export async function dedupeLabel(canonical: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const hex = await canonicalDigest(canonical);
 
   return `${FERNLY_APP_ID}-incident-${hex.slice(0, 24)}`;
+}
+
+export async function canonicalDigest(canonical: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
