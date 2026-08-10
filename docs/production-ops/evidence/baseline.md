@@ -62,3 +62,9 @@ A tracked file named `supabase/.revenuecat-webhook-secret.local` existed at the 
 ## Dormant gate
 
 The baseline is **not** at the dormant-deployment gate because the kill switch is off and the recovered production artifacts are not yet reviewed, tested, committed, and redeployed from source control.
+
+Immediately before the dormant gate, linked migration provenance showed only
+`20260811090000` pending. Linked lint reported one ambiguity in the deployed
+legacy `reserve_fernly_paging_delivery` function. The reviewed hardening
+migration drops that legacy function; linked lint must be repeated after the
+dormant migration is applied.

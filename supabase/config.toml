@@ -20,3 +20,11 @@ verify_jwt = true
 # Supabase JWT; the function verifies REVENUECAT_WEBHOOK_SECRET itself.
 [functions.revenuecat-webhook]
 verify_jwt = false
+
+# Public monitor endpoint; the handler returns only fixed health fields.
+[functions.production-health]
+verify_jwt = false
+
+# Supports an operations HMAC and authenticated mobile reports in the handler.
+[functions.production-incident]
+verify_jwt = false
