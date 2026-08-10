@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { reportEdgeOperationalFailure } from "../_shared/production-ops/edgeReporter.ts";
+import type { PagingRpcClient } from "../_shared/production-ops/reservation.ts";
 
 /**
  * RevenueCat → Supabase entitlement sync (Phase 13 §7).
@@ -92,9 +94,22 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const adminClient = supabaseUrl && serviceRoleKey
+    ? createClient(supabaseUrl, serviceRoleKey)
+    : null;
   const expectedSecret = Deno.env.get("REVENUECAT_WEBHOOK_SECRET") ?? "";
 
-  if (!expectedSecret) {
+  if (!expectedSecret || !adminClient) {
+    if (adminClient) {
+      reportEdgeOperationalFailure(
+        adminClient as unknown as PagingRpcClient,
+        "revenuecat_webhook_failed",
+        "webhook_not_configured"
+      );
+    }
+
     return jsonResponse({ ok: false, error: "webhook_not_configured" }, 500);
   }
 
@@ -138,11 +153,6 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: true, handled: "no_supabase_user", type: eventType });
   }
 
-  const adminClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-  );
-
   const { error } = await adminClient.from("subscriptions").upsert(
     {
       user_id: userId,
@@ -163,10 +173,12 @@ Deno.serve(async (req) => {
     // Non-2xx so RevenueCat retries (e.g. transient DB issue). A user id that
     // fails the FK would also land here — RevenueCat's bounded retries stop
     // eventually, and the durable state reconciles on the next event.
-    console.error("revenuecat-webhook upsert failed", {
-      type: eventType,
-      message: error.message
-    });
+    console.error("revenuecat-webhook upsert failed", { code: "upsert_failed" });
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "revenuecat_webhook_failed",
+      "upsert_failed"
+    );
 
     return jsonResponse({ ok: false, error: "upsert_failed" }, 500);
   }

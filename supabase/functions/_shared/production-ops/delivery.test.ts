@@ -176,3 +176,39 @@ test("provider failure cannot prevent independent Jira delivery", async () => {
     jira: { state: "delivered", attempts: 1 }
   });
 });
+
+test("a missing provider configuration cannot suppress configured Jira delivery", async () => {
+  const channels: string[] = [];
+  const client = {
+    rpc: async (name: string, parameters: Record<string, unknown>) => {
+      if (name === "lease_fernly_production_delivery") {
+        channels.push(String(parameters.p_channel));
+        return { data: 1, error: null };
+      }
+
+      return { data: null, error: null };
+    }
+  };
+
+  const result = await dispatchReservation(
+    client,
+    async () => new Response(null, { status: 204 }),
+    deliveryInput,
+    reservation,
+    {
+      provider: null,
+      jira: { url: "https://jira.invalid/fernly-webhook" }
+    },
+    {
+      now: () => new Date("2026-08-11T00:02:00.000Z"),
+      timeoutMs: 50,
+      sleep: async () => undefined
+    }
+  );
+
+  assert.deepEqual(result, {
+    provider: { state: "skipped", attempts: 0 },
+    jira: { state: "delivered", attempts: 1 }
+  });
+  assert.deepEqual(channels, ["jira"]);
+});

@@ -2,8 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { parseClientIncidentInput } from "../_shared/productionPaging.ts";
-import { reportTrustedProductionIncident } from "../_shared/productionPagingServer.ts";
+import { parseClientIncidentInput } from "../_shared/production-ops/clientContract.ts";
+import { reportEdgeOperationalFailure } from "../_shared/production-ops/edgeReporter.ts";
 import {
   reserveProductionIncident,
   type PagingRpcClient
@@ -134,13 +134,13 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: false, code: "auth_required" }, 401);
   }
 
-  const state = await reportTrustedProductionIncident({
-    adminClient: createClient(supabaseUrl, serviceRoleKey, {
+  reportEdgeOperationalFailure(
+    createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false }
-    }),
-    ...parsed.value,
-    principalId: user.id
-  });
+    }) as unknown as PagingRpcClient,
+    parsed.value.category,
+    parsed.value.code
+  );
 
-  return jsonResponse({ ok: state !== "error", state }, state === "error" ? 503 : 202);
+  return jsonResponse({ ok: true, state: "accepted" }, 202);
 });

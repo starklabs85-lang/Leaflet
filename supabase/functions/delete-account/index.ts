@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { reportEdgeOperationalFailure } from "../_shared/production-ops/edgeReporter.ts";
+import type { PagingRpcClient } from "../_shared/production-ops/reservation.ts";
 import { runAccountDeletionServerFlow } from "./flow.ts";
 
 type StorageEntry = {
@@ -319,7 +321,7 @@ Deno.serve(async (req) => {
 
         if (error) {
           console.warn("delete-account session revoke failed", {
-            message: error.message
+            code: "session_revoke_failed"
           });
         }
       },
@@ -349,6 +351,12 @@ Deno.serve(async (req) => {
         : code === "delete_user_failed"
           ? "Your account could not be deleted. Please try again."
           : "Your privacy deletion request could not be secured. Please try again.";
+
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "account_delete_failed",
+      code
+    );
 
     return jsonResponse(
       {

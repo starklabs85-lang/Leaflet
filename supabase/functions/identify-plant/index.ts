@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { reportEdgeOperationalFailure } from "../_shared/production-ops/edgeReporter.ts";
+import type { PagingRpcClient } from "../_shared/production-ops/reservation.ts";
 import { getScanAccess, type ScanType } from "./access.ts";
 
 type Difficulty = "easy" | "moderate" | "hard";
@@ -745,11 +747,19 @@ Deno.serve(async (req) => {
   const imageHash = await sha256(validation.value.imageBase64);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-  const { count } = await adminClient
+  const { count, error: scanCountError } = await adminClient
     .from("scan_events")
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
     .gte("created_at", oneHourAgo);
+
+  if (scanCountError) {
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "identify_failed",
+      "scan_event_unavailable"
+    );
+  }
 
   if ((count ?? 0) >= MAX_PREMIUM_SCANS_PER_HOUR) {
     return jsonResponse(
@@ -765,20 +775,36 @@ Deno.serve(async (req) => {
     );
   }
 
-  const { data: cached } = await adminClient
+  const { data: cached, error: cacheReadError } = await adminClient
     .from("scan_cache")
     .select("result")
     .eq("image_hash", imageHash)
     .eq("scan_type", validation.value.scanType)
     .maybeSingle();
 
+  if (cacheReadError) {
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "identify_failed",
+      "scan_cache_unavailable"
+    );
+  }
+
   if (cached?.result) {
-    await adminClient.from("scan_events").insert({
+    const { error: scanEventError } = await adminClient.from("scan_events").insert({
       user_id: user.id,
       image_hash: imageHash,
       scan_type: validation.value.scanType,
       cache_hit: true
     });
+
+    if (scanEventError) {
+      reportEdgeOperationalFailure(
+        adminClient as unknown as PagingRpcClient,
+        "identify_failed",
+        "scan_event_unavailable"
+      );
+    }
 
     const result = cached.result as IdentifyPlantResult | PlantDiagnosisResult;
 
@@ -803,6 +829,18 @@ Deno.serve(async (req) => {
   });
 
   if (!openAIResult.ok) {
+    const incidentCode =
+      openAIResult.code === "missing_openai_key" ||
+        openAIResult.code === "openai_unavailable"
+        ? openAIResult.code
+        : "validation_failed";
+
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "identify_failed",
+      incidentCode
+    );
+
     return jsonResponse(
       {
         ok: false,
@@ -820,18 +858,34 @@ Deno.serve(async (req) => {
       ? await upsertSpecies(adminClient, openAIResult.result as IdentifyPlantResult)
       : (openAIResult.result as PlantDiagnosisResult);
 
-  await adminClient.from("scan_cache").insert({
+  const { error: scanCacheError } = await adminClient.from("scan_cache").insert({
     image_hash: imageHash,
     scan_type: validation.value.scanType,
     result
   });
 
-  await adminClient.from("scan_events").insert({
+  if (scanCacheError) {
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "identify_failed",
+      "scan_cache_unavailable"
+    );
+  }
+
+  const { error: scanEventError } = await adminClient.from("scan_events").insert({
     user_id: user.id,
     image_hash: imageHash,
     scan_type: validation.value.scanType,
     cache_hit: false
   });
+
+  if (scanEventError) {
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "identify_failed",
+      "scan_event_unavailable"
+    );
+  }
 
   return jsonResponse({
     ok: true,

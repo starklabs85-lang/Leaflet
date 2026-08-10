@@ -208,8 +208,8 @@ export async function dispatchReservation(
   input: IncidentInput,
   reservation: ReservationDecision,
   configuration: {
-    provider: { url: string; hmacSecret: string };
-    jira: { url: string };
+    provider: { url: string; hmacSecret: string } | null;
+    jira: { url: string } | null;
   },
   dependencies: {
     now: () => Date;
@@ -217,7 +217,7 @@ export async function dispatchReservation(
     sleep: (milliseconds: number) => Promise<void>;
   }
 ) {
-  const providerTask = reservation.sendProvider && reservation.incidentId
+  const providerTask = configuration.provider && reservation.sendProvider && reservation.incidentId
     ? safeDispatch(() =>
         dispatchChannel({
           client,
@@ -227,8 +227,8 @@ export async function dispatchReservation(
           deliveryKey: reservation.providerDeliveryKey!,
           buildRequest: () =>
             buildProviderRequest(
-              configuration.provider.url,
-              configuration.provider.hmacSecret,
+              configuration.provider!.url,
+              configuration.provider!.hmacSecret,
               buildProviderPayload(input, reservation),
               dependencies.now().toISOString()
             ),
@@ -237,7 +237,7 @@ export async function dispatchReservation(
         })
       )
     : Promise.resolve({ state: "skipped", attempts: 0 } as DispatchResult);
-  const jiraTask = reservation.sendJira && reservation.incidentId
+  const jiraTask = configuration.jira && reservation.sendJira && reservation.incidentId
     ? safeDispatch(() =>
         dispatchChannel({
           client,
@@ -245,7 +245,8 @@ export async function dispatchReservation(
           incidentId: reservation.incidentId!,
           channel: "jira",
           deliveryKey: reservation.jiraDeliveryKey!,
-          buildRequest: () => buildJiraRequest(configuration.jira.url, buildJiraPayload(input, reservation)),
+          buildRequest: () =>
+            buildJiraRequest(configuration.jira!.url, buildJiraPayload(input, reservation)),
           timeoutMs: dependencies.timeoutMs,
           sleep: dependencies.sleep
         })

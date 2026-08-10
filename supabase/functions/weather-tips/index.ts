@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { reportEdgeOperationalFailure } from "../_shared/production-ops/edgeReporter.ts";
+import type { PagingRpcClient } from "../_shared/production-ops/reservation.ts";
 
 import {
   deriveWeatherTips,
@@ -343,6 +345,12 @@ Deno.serve(async (req) => {
   });
 
   if (!weather) {
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "weather_tips_failed",
+      "weather_unavailable"
+    );
+
     return jsonResponse(
       { code: "weather_unavailable", message: "Weather is unavailable right now." },
       503
@@ -354,6 +362,12 @@ Deno.serve(async (req) => {
   try {
     plants = await loadEnginePlants(userClient, user.id);
   } catch {
+    reportEdgeOperationalFailure(
+      adminClient as unknown as PagingRpcClient,
+      "weather_tips_failed",
+      "plants_unavailable"
+    );
+
     return jsonResponse(
       { code: "plants_unavailable", message: "Your plants could not be loaded." },
       500
