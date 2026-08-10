@@ -1,7 +1,7 @@
 -- Harden Fernly production paging without deleting existing incident history.
 -- The migration is intentionally dormant: paging disabled, kill switch enabled.
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 drop function if exists public.reserve_fernly_paging_delivery(
   text, text, text, text, text, timestamptz, boolean
@@ -120,12 +120,12 @@ alter table public.production_paging_incidents
 update public.production_paging_incidents
 set canonical_digest = coalesce(
       canonical_digest,
-      encode(digest(app_id || ':' || idempotency_key, 'sha256'), 'hex')
+      encode(extensions.digest(app_id || ':' || idempotency_key, 'sha256'), 'hex')
     ),
     request_nonce = coalesce(
       request_nonce,
       replace(provider_nonce::text, '-', ''),
-      substring(encode(digest(app_id || ':nonce:' || idempotency_key, 'sha256'), 'hex') for 32)
+      substring(encode(extensions.digest(app_id || ':nonce:' || idempotency_key, 'sha256'), 'hex') for 32)
     )
 where canonical_digest is null
    or request_nonce is null;
