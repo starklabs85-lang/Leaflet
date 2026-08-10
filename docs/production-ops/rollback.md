@@ -81,7 +81,7 @@ After the kill switch is confirmed, provider/Jira/ingress credentials can be
 detached from the Edge environment without exposing their values:
 
 ```bash
-supabase secrets unset FERNLY_PAGING_PROVIDER_URL FERNLY_PAGING_PROVIDER_HMAC_SECRET FERNLY_JIRA_WEBHOOK_URL FERNLY_PRODUCTION_INGRESS_HMAC_SECRET --project-ref gnrjqqoidzuwzvhhfggh
+supabase secrets unset FERNLY_PAGING_PROVIDER_URL FERNLY_PAGING_PROVIDER_HMAC_SECRET FERNLY_JIRA_WEBHOOK_URL FERNLY_INCIDENT_HMAC_SECRET --project-ref gnrjqqoidzuwzvhhfggh
 ```
 
 Restore only newly generated Fernly-only credentials through direct owner entry,

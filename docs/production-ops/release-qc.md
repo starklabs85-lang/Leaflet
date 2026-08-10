@@ -22,20 +22,17 @@ Required before dormant deployment:
 
 - [x] 80 focused application regressions pass when serialized.
 - [x] Analytics generated-manifest check passes.
-- [x] 40 production-ops/provider/config tests pass after the deployment-config
-  guard was added (39 already passed at provider commit `a8e81ff6`).
+- [x] 42 production-ops/provider/config tests pass, including the deployed
+  public-health HEAD probe used by UptimeRobot.
 - [x] 29 pgTAP reservation/replay/kill-switch/outbox checks pass locally.
 - [x] Newly added production-ops Deno modules type-check.
 - [x] The complete Edge check has no introduced error; it retains the same 24
   baseline Supabase generic-inference errors.
-- [x] Linked migration list was re-run: only `20260811090000` is pending.
-- [x] Linked pre-migration lint was re-run. It reports one ambiguity in the
-  deployed legacy `reserve_fernly_paging_delivery` function; the pending
-  hardening migration deliberately drops that function.
-- [ ] Linked lint is re-run after dormant migration deployment to prove the
-  legacy finding is removed and no new finding exists.
-- [ ] Dormant production migration/function provenance is captured.
-- [ ] Public health and unauthorized-ingress proofs pass.
+- [x] Linked migration list matches through `20260811090000` after dormant
+  deployment.
+- [x] Linked post-migration lint reports no schema errors or warnings.
+- [x] Dormant production migration/function provenance is captured.
+- [x] Public GET/HEAD health and unauthorized-ingress proofs pass.
 - [ ] Provider, Jira, canary, replay, and kill-switch proofs pass.
 
 The repository tracks an incomplete/non-executable dependency tree. The normal

@@ -14,7 +14,7 @@ text, stack traces, IP addresses, or unrelated account state.
 
 ## Required deployment and activation evidence
 
-- `dormant-deployment.md`: pending.
+- [Dormant deployment](dormant-deployment.md): complete.
   - reviewed branch/commit and linked migration provenance;
   - dormant flags `enabled=false`, `kill_switch=true`;
   - deployed function versions;
@@ -29,7 +29,7 @@ text, stack traces, IP addresses, or unrelated account state.
   - exact replay counts remain one;
   - kill-switch drill creates no provider/Jira/audit activity;
   - restored final flags.
-- `monitoring-and-crash.md`: pending.
+- [Monitoring and crash coverage](monitoring-and-crash.md): complete.
   - UptimeRobot monitor and successful check;
   - Firebase Crashlytics known-gap proof.
 

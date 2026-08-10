@@ -9,7 +9,7 @@
 - Required issue type: `Bug`
 - Required dedupe label: `^fernly-incident-[a-f0-9]{24}$`
 
-Create one Jira Automation rule named `Fernly Production Incident Create or
+Create one Jira Automation rule named `Fernly Production Incident Create
 Update`. Its incoming-webhook URL is a Fernly-only credential. Enter it directly
 as the Supabase secret `FERNLY_JIRA_WEBHOOK_URL`; never put the URL in Git, chat,
 screenshots, email, comments, or another app.
@@ -21,7 +21,6 @@ screenshots, email, comments, or another app.
 2. Add these guards before any lookup or issue action:
    - `{{webhookData.appId}}` equals `fernly`.
    - `{{webhookData.environment}}` equals `production`.
-   - `{{webhookData.severity}}` equals `critical`.
    - `{{webhookData.dedupeLabel}}` matches
      `^fernly-incident-[a-f0-9]{24}$`.
 3. Add **Lookup issues** with this exact-label JQL:
@@ -41,8 +40,8 @@ Create one issue with:
 - Project: `FERN`
 - Issue type: `Bug`
 - Parent/Epic: `FERN-2` when the project exposes the Parent field
-- Summary: `[FERNLY][PRODUCTION] {{webhookData.category}} / {{webhookData.code}}`
-- Labels: `{{webhookData.dedupeLabel}}`, `fernly-production-incident`
+- Summary: `[FERNLY][CRITICAL] {{webhookData.category}}/{{webhookData.code}}`
+- Label: `{{webhookData.dedupeLabel}}`
 - Description containing only these fixed operational fields:
 
   ```text
@@ -57,7 +56,7 @@ Create one issue with:
   dedupeLabel={{webhookData.dedupeLabel}}
   ```
 
-After creation, add a **Log action** whose entire message is:
+The create branch must include a **Log action** whose entire message is:
 
 ```text
 FERNLY_JIRA_CREATE
@@ -68,8 +67,8 @@ FERNLY_JIRA_CREATE
 First require `{{lookupIssues.size}}` equals `1`. If it is greater than one,
 stop the rule and investigate; do not create or fan out updates.
 
-Use a related-issues JQL branch with the same exact-label JQL above. Add the
-`fernly-production-incident` label if missing and add this fixed comment:
+Use a related-issues JQL branch with the same exact-label JQL above and add this
+fixed comment:
 
 ```text
 Fernly production incident occurrence
@@ -83,7 +82,7 @@ occurredAt={{webhookData.occurredAt}}
 dedupeLabel={{webhookData.dedupeLabel}}
 ```
 
-Then add a **Log action** whose entire message is:
+The update branch must include a **Log action** whose entire message is:
 
 ```text
 FERNLY_JIRA_UPDATE

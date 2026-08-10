@@ -21,7 +21,7 @@ codes and fixed metadata.
 ## Authoritative setup
 
 1. In the signed-in Stark Labs Apps Script account, create a standalone project
-   named `Fernly Production Alerts`.
+   named `Fernly Production Alert Email`.
 2. Replace the project files with `Code.gs` and `appsscript.json` from
    `ops/apps-script/fernly-production-alerts/`.
 3. In Project Settings, add the Script Property
