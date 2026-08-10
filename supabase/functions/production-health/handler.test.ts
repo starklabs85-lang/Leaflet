@@ -20,6 +20,23 @@ test("healthy response exposes only the fixed Fernly API/database contract", asy
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
+test("HEAD checks database health without exposing a response body", async () => {
+  let calls = 0;
+  const response = await handleProductionHealth(new Request("https://example.invalid", {
+    method: "HEAD"
+  }), {
+    databaseHealthy: async () => {
+      calls += 1;
+      return true;
+    }
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(calls, 1);
+});
+
 test("database failure returns one fixed unavailable response", async () => {
   for (const databaseHealthy of [
     async () => false,
@@ -41,7 +58,7 @@ test("database failure returns one fixed unavailable response", async () => {
   }
 });
 
-test("health rejects non-GET methods without checking the database", async () => {
+test("health rejects methods other than GET and HEAD without checking the database", async () => {
   let calls = 0;
   const response = await handleProductionHealth(new Request("https://example.invalid", {
     method: "POST"
