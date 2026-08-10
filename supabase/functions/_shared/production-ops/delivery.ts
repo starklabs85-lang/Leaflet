@@ -60,11 +60,18 @@ export async function buildProviderRequest(
   payload: ProviderPayload,
   timestamp: string
 ) {
-  const body = JSON.stringify(payload);
+  const payloadBody = JSON.stringify(payload);
   const signature = await hmacHex(
     hmacSecret,
-    `${timestamp}.${payload.deliveryKey}.${body}`
+    `${timestamp}.${payload.deliveryKey}.${payloadBody}`
   );
+  const formattedSignature = `sha256=${signature}`;
+  const body = JSON.stringify({
+    nonce: payload.deliveryKey,
+    payload,
+    signature: formattedSignature,
+    timestamp
+  });
 
   return new Request(requireHttpsUrl(url), {
     method: "POST",
@@ -73,7 +80,7 @@ export async function buildProviderRequest(
       "X-Starklabs-App-Id": "fernly",
       "X-Starklabs-Timestamp": timestamp,
       "X-Starklabs-Nonce": payload.deliveryKey,
-      "X-Starklabs-Signature": `sha256=${signature}`
+      "X-Starklabs-Signature": formattedSignature
     },
     body
   });
@@ -90,13 +97,39 @@ function buildJiraRequest(url: string, payload: JiraPayload) {
 export async function deliverWithTimeout(
   fetcher: Fetcher,
   request: Request,
-  timeoutMs: number
+  timeoutMs: number,
+  responseContract?: "provider"
 ): Promise<DeliveryAttempt> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetcher(new Request(request, { signal: controller.signal }));
+
+    if (response.ok && responseContract === "provider") {
+      try {
+        const body = await response.json();
+        const exactStatus = body !== null &&
+          typeof body === "object" &&
+          !Array.isArray(body) &&
+          Object.keys(body).length === 1 &&
+          typeof (body as { status?: unknown }).status === "string"
+          ? (body as { status: string }).status
+          : null;
+
+        if (exactStatus === "sent" || exactStatus === "duplicate") {
+          return { state: "delivered", code: "accepted", retryable: false };
+        }
+
+        if (exactStatus === "unauthorized" || exactStatus === "malformed") {
+          return { state: "rejected", code: "provider_rejected", retryable: false };
+        }
+      } catch {
+        // A provider response without the fixed JSON contract is retried safely.
+      }
+
+      return { state: "failed", code: "provider_invalid_response", retryable: true };
+    }
 
     if (response.ok) {
       return { state: "delivered", code: "accepted", retryable: false };
@@ -126,6 +159,7 @@ export async function dispatchChannel({
   channel,
   deliveryKey,
   buildRequest,
+  responseContract,
   timeoutMs,
   sleep
 }: {
@@ -135,6 +169,7 @@ export async function dispatchChannel({
   channel: Channel;
   deliveryKey: string;
   buildRequest: () => Request | Promise<Request>;
+  responseContract?: "provider";
   timeoutMs: number;
   sleep: (milliseconds: number) => Promise<void>;
 }): Promise<DispatchResult> {
@@ -168,7 +203,12 @@ export async function dispatchChannel({
     }
 
     lastAttempt = attempt;
-    const result = await deliverWithTimeout(fetcher, await buildRequest(), timeoutMs);
+    const result = await deliverWithTimeout(
+      fetcher,
+      await buildRequest(),
+      timeoutMs,
+      responseContract
+    );
     lastState = result.state;
     const completion = await client.rpc("complete_fernly_production_delivery", {
       p_app_id: "fernly",
@@ -232,6 +272,7 @@ export async function dispatchReservation(
               buildProviderPayload(input, reservation),
               dependencies.now().toISOString()
             ),
+          responseContract: "provider",
           timeoutMs: dependencies.timeoutMs,
           sleep: dependencies.sleep
         })

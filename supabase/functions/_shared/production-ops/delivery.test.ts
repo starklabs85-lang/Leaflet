@@ -12,20 +12,21 @@ import { deliveryInput, reservation } from "./test-fixtures.ts";
 const secret = "0123456789abcdef0123456789abcdef";
 
 test("provider request signs the fixed body, timestamp, and delivery key", async () => {
+  const payload = {
+    appId: "fernly" as const,
+    environment: "production" as const,
+    category: "production_canary" as const,
+    code: "controlled_test" as const,
+    severity: "critical" as const,
+    dedupeLabel: "fernly-incident-eabf86951d6109555dcd82ab",
+    occurrenceCount: 1,
+    deliveryKey: "fernly-incident-eabf86951d6109555dcd82ab",
+    occurredAt: "2026-08-11T00:00:00.000Z"
+  };
   const request = await buildProviderRequest(
     "https://provider.invalid/fernly",
     secret,
-    {
-      appId: "fernly",
-      environment: "production",
-      category: "production_canary",
-      code: "controlled_test",
-      severity: "critical",
-      dedupeLabel: "fernly-incident-eabf86951d6109555dcd82ab",
-      occurrenceCount: 1,
-      deliveryKey: "fernly-incident-eabf86951d6109555dcd82ab",
-      occurredAt: "2026-08-11T00:00:00.000Z"
-    },
+    payload,
     "2026-08-11T00:02:00.000Z"
   );
 
@@ -39,6 +40,12 @@ test("provider request signs the fixed body, timestamp, and delivery key", async
     request.headers.get("x-starklabs-signature"),
     "sha256=f21fbce54d4528a50e13b7dec1d0af9fb02ee47c129ee290724434d7e142af01"
   );
+  assert.deepEqual(await request.json(), {
+    nonce: payload.deliveryKey,
+    payload,
+    signature: "sha256=f21fbce54d4528a50e13b7dec1d0af9fb02ee47c129ee290724434d7e142af01",
+    timestamp: "2026-08-11T00:02:00.000Z"
+  });
 });
 
 test("bounded request reports timeout without exposing an exception", async () => {
@@ -131,6 +138,37 @@ test("client rejection completes once and is never retried", async () => {
   assert.deepEqual(result, { state: "rejected", attempts: 1 });
   assert.equal(leaseCalls, 1);
   assert.deepEqual(completionStates, ["rejected"]);
+});
+
+test("provider HTTP success is accepted only with a fixed sent or duplicate status", async () => {
+  let leaseAttempt = 0;
+  const completionCodes: unknown[] = [];
+  const client = {
+    rpc: async (name: string, parameters: Record<string, unknown>) => {
+      if (name === "lease_fernly_production_delivery") {
+        leaseAttempt += 1;
+        return { data: leaseAttempt, error: null };
+      }
+
+      completionCodes.push(parameters.p_delivery_code);
+      return { data: null, error: null };
+    }
+  };
+
+  const result = await dispatchChannel({
+    client,
+    fetcher: async () => Response.json({ status: "unauthorized" }),
+    incidentId: reservation.incidentId!,
+    channel: "provider",
+    deliveryKey: reservation.providerDeliveryKey!,
+    buildRequest: () => new Request("https://provider.invalid", { method: "POST" }),
+    responseContract: "provider",
+    timeoutMs: 50,
+    sleep: async () => undefined
+  });
+
+  assert.deepEqual(result, { state: "rejected", attempts: 1 });
+  assert.deepEqual(completionCodes, ["provider_rejected"]);
 });
 
 test("provider failure cannot prevent independent Jira delivery", async () => {
