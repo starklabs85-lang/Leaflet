@@ -5,6 +5,7 @@ private/
 .expo/
 .claude/
 .codex/
+.worktrees/
 .playwright-mcp/
 node_modules/
 builds/
