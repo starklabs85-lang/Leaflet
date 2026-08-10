@@ -594,13 +594,13 @@ create or replace function public.lease_fernly_production_delivery(
   p_delivery_key text,
   p_lease_seconds integer
 )
-returns boolean
+returns integer
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_rows integer := 0;
+  v_attempt integer;
 begin
   if p_app_id <> 'fernly'
      or p_channel not in ('provider', 'jira')
@@ -620,12 +620,11 @@ begin
     and delivery.delivery_key = p_delivery_key
     and delivery.state in ('pending', 'failed')
     and delivery.attempts < 3
-    and (delivery.lease_until is null or delivery.lease_until <= now());
+    and (delivery.lease_until is null or delivery.lease_until <= now())
+  returning delivery.attempts into v_attempt;
 
-  get diagnostics v_rows = row_count;
-
-  if v_rows = 0 then
-    return false;
+  if v_attempt is null then
+    return 0;
   end if;
 
   if p_channel = 'provider' then
@@ -659,7 +658,7 @@ begin
       and delivery.delivery_key = p_delivery_key;
   end if;
 
-  return true;
+  return v_attempt;
 end;
 $$;
 

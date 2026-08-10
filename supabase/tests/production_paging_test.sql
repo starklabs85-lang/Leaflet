@@ -40,11 +40,11 @@ create or replace function pg_temp.lease_delivery(
   p_channel text,
   p_delivery_key text
 )
-returns boolean
+returns integer
 language plpgsql
 as $$
 declare
-  v_result boolean;
+  v_result integer;
 begin
   execute $query$
     select public.lease_fernly_production_delivery(
@@ -54,10 +54,10 @@ begin
   into v_result
   using p_incident_id, p_channel, p_delivery_key;
 
-  return coalesce(v_result, false);
+  return coalesce(v_result, 0);
 exception
-  when undefined_function or raise_exception then
-    return false;
+  when undefined_function or raise_exception or datatype_mismatch or invalid_text_representation then
+    return 0;
 end;
 $$;
 
@@ -270,12 +270,13 @@ select is(
   'exact replay increments occurrence count on the existing incident'
 );
 
-select ok(
+select is(
   pg_temp.lease_delivery(
     (select (value->>'incident_id')::uuid from test_results where name = 'replay'),
     'jira',
     (select value->>'jira_delivery_key' from test_results where name = 'replay')
   ),
+  1,
   'Jira replay delivery acquires an independent lease'
 );
 
@@ -340,12 +341,13 @@ select ok(
   'a later cooldown occurrence cannot invalidate the leased Jira replay'
 );
 
-select ok(
+select is(
   pg_temp.lease_delivery(
     (select (value->>'incident_id')::uuid from test_results where name = 'cooldown'),
     'jira',
     (select value->>'jira_delivery_key' from test_results where name = 'cooldown')
   ),
+  1,
   'cooldown Jira update keeps its own pending outbox lease'
 );
 
@@ -385,12 +387,13 @@ select is(
   'the second same-category delivery is rejected at the hourly quota'
 );
 
-select ok(
+select is(
   pg_temp.lease_delivery(
     (select (value->>'incident_id')::uuid from test_results where name = 'first'),
     'provider',
     (select value->>'provider_delivery_key' from test_results where name = 'first')
   ),
+  1,
   'pending provider delivery can acquire one bounded lease'
 );
 
@@ -400,7 +403,7 @@ select is(
     'provider',
     (select value->>'provider_delivery_key' from test_results where name = 'first')
   ),
-  false,
+  0,
   'an active provider lease cannot be acquired twice'
 );
 
@@ -419,7 +422,7 @@ select is(
     'provider',
     (select value->>'provider_delivery_key' from test_results where name = 'first')
   ),
-  false,
+  0,
   'completed provider delivery cannot be leased again'
 );
 

@@ -8,6 +8,7 @@ import {
   reserveProductionIncident,
   type PagingRpcClient
 } from "../_shared/production-ops/reservation.ts";
+import { dispatchReservation } from "../_shared/production-ops/delivery.ts";
 import { handleProductionIncident } from "./handler.ts";
 
 const corsHeaders = {
@@ -48,23 +49,44 @@ Deno.serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false }
     });
-    const providerConfigured = Boolean(
-      Deno.env.get("FERNLY_PAGING_PROVIDER_URL")?.trim() &&
-        Deno.env.get("FERNLY_PAGING_PROVIDER_HMAC_SECRET")?.trim()
-    );
-    const jiraConfigured = Boolean(
-      Deno.env.get("FERNLY_JIRA_WEBHOOK_URL")?.trim() &&
-        Deno.env.get("FERNLY_JIRA_WEBHOOK_SECRET")?.trim()
-    );
+    const providerUrl = Deno.env.get("FERNLY_PAGING_PROVIDER_URL")?.trim() ?? "";
+    const providerHmacSecret =
+      Deno.env.get("FERNLY_PAGING_PROVIDER_HMAC_SECRET")?.trim() ?? "";
+    const jiraUrl = Deno.env.get("FERNLY_JIRA_WEBHOOK_URL")?.trim() ?? "";
+    const providerConfigured = Boolean(providerUrl && providerHmacSecret);
+    const jiraConfigured = Boolean(jiraUrl);
+    const rpcClient = adminClient as unknown as PagingRpcClient;
 
     return handleProductionIncident(req, {
       now: () => new Date(),
       operationsSecret,
-      reserve: (input) =>
-        reserveProductionIncident(adminClient as unknown as PagingRpcClient, input, {
+      reserve: async (input) => {
+        const reservation = await reserveProductionIncident(rpcClient, input, {
           providerConfigured,
           jiraConfigured
-        })
+        });
+
+        if (providerConfigured && jiraConfigured) {
+          await dispatchReservation(
+            rpcClient,
+            (request) => fetch(request),
+            input,
+            reservation,
+            {
+              provider: { url: providerUrl, hmacSecret: providerHmacSecret },
+              jira: { url: jiraUrl }
+            },
+            {
+              now: () => new Date(),
+              timeoutMs: 5_000,
+              sleep: (milliseconds) =>
+                new Promise((resolve) => setTimeout(resolve, milliseconds))
+            }
+          ).catch(() => undefined);
+        }
+
+        return reservation;
+      }
     });
   }
 
