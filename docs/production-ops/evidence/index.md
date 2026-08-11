@@ -19,7 +19,8 @@ text, stack traces, IP addresses, or unrelated account state.
   - dormant flags `enabled=false`, `kill_switch=true`;
   - deployed function versions;
   - public health and unauthorized ingress.
-- `provider-and-jira.md`: pending.
+- [Provider and Jira](provider-and-jira.md): provider and rejection proofs
+  complete; Jira proof blocked on rule activation.
   - one controlled provider message in each approved inbox;
   - exact provider replay remains one per inbox;
   - Jira Automation create/update audit and one exact-label Bug;

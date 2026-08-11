@@ -10,14 +10,19 @@
 - Required dedupe label: `^fernly-incident-[a-f0-9]{24}$`
 
 Create one Jira Automation rule named `Fernly Production Incident Create
-Update`. Its incoming-webhook URL is a Fernly-only credential. Enter it directly
-as the Supabase secret `FERNLY_JIRA_WEBHOOK_URL`; never put the URL in Git, chat,
-screenshots, email, comments, or another app.
+Update`. Its incoming-webhook URL and generated token are Fernly-only
+credentials. Enter the authenticated `URL/token` form directly as the Supabase
+secret `FERNLY_JIRA_WEBHOOK_URL`; never put either value in Git, chat,
+screenshots, email, comments, or another app. Atlassian documents the appended
+token form for callers that do not send `X-Automation-Webhook-Token`:
+<https://support.atlassian.com/cloud-automation/docs/configure-the-incoming-webhook-trigger-in-atlassian-automation/>.
 
 ## Rule structure
 
-1. Add the **Incoming webhook** trigger. Do not let the webhook select arbitrary
-   issues from caller input.
+1. Add the **Incoming webhook** trigger, generate its Fernly-only token, and do
+   not let the webhook select arbitrary issues from caller input. Regenerating
+   the token invalidates the previous value and requires an immediate Supabase
+   secret update while the rule and paging remain disabled.
 2. Add these guards before any lookup or issue action:
    - `{{webhookData.appId}}` equals `fernly`.
    - `{{webhookData.environment}}` equals `production`.
