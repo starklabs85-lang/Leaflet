@@ -19,13 +19,12 @@ text, stack traces, IP addresses, or unrelated account state.
   - dormant flags `enabled=false`, `kill_switch=true`;
   - deployed function versions;
   - public health and unauthorized ingress.
-- [Provider and Jira](provider-and-jira.md): provider and rejection proofs
-  complete; Jira proof blocked on rule activation.
+- [Provider and Jira](provider-and-jira.md): complete.
   - one controlled provider message in each approved inbox;
   - exact provider replay remains one per inbox;
   - Jira Automation create/update audit and one exact-label Bug;
   - wrong-app and wrong-token rejection.
-- `canary-and-kill-switch.md`: pending.
+- [Canary and kill switch](canary-and-kill-switch.md): complete.
   - one live canary email per inbox and one Jira Bug;
   - exact replay counts remain one;
   - kill-switch drill creates no provider/Jira/audit activity;
@@ -34,6 +33,6 @@ text, stack traces, IP addresses, or unrelated account state.
   - UptimeRobot monitor and successful check;
   - Firebase Crashlytics known-gap proof.
 
-Paging must be reported as **blocked** until every activation item above is
-present. HTTP 2xx is not inbox proof, and a Jira issue is not Automation audit
-proof.
+All activation evidence is present. Fernly paging is live with final flags
+`enabled=true`, `kill_switch=false`. HTTP 2xx was not treated as inbox proof,
+and Jira issue existence was not treated as Automation audit proof.

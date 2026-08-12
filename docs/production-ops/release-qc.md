@@ -33,13 +33,15 @@ Required before dormant deployment:
 - [x] Linked post-migration lint reports no schema errors or warnings.
 - [x] Dormant production migration/function provenance is captured.
 - [x] Public GET/HEAD health and unauthorized-ingress proofs pass.
-- [ ] Provider, Jira, canary, replay, and kill-switch proofs pass.
+- [x] Provider, Jira, canary, replay, and kill-switch proofs pass.
 
 The repository tracks an incomplete/non-executable dependency tree. The normal
 `npm run typecheck` wrapper cannot execute its tracked `tsc` shim, and concurrent
 TSX transforms have a baseline race. Neither issue was introduced by this
-rollout. Tests are run with a clean TSX executable and serial concurrency where
-needed; the defect remains a release-tooling follow-up.
+rollout. Final verification used the compiler entry point directly and passed
+with no diagnostics; the 80 focused regressions passed with a clean TSX
+executable and serial concurrency. The wrapper defect remains a release-tooling
+follow-up.
 
 ## Product-path QC
 
@@ -60,10 +62,12 @@ upload plant images or use a real profile merely to exercise paging.
 
 - Dormant database and Edge deployment: **allowed after linked lint/migration
   review**, with `enabled=false` and `kill_switch=true`.
-- Live paging: **NO-SHIP** until both-inbox, exact replay, Jira audit/dedupe,
-  wrong-app/wrong-token, canary, and kill-switch proofs are all present.
+- Live paging: **SHIP / LIVE**. Both-inbox, exact replay, Jira audit/dedupe,
+  wrong-app/wrong-token, canary, and kill-switch proofs are present. Final
+  flags are `enabled=true`, `kill_switch=false`.
 - Mobile binary: **no new build required** for this backend-only change.
 - iOS build/submission: **not authorized and not performed**.
 - Crashlytics: explicit known gap; see `crashlytics-gap.md`.
 
-If any live gate is missing, final status must be “paging blocked,” never “live.”
+If a future verification loses any live gate, immediately restore dormant flags
+and report paging as blocked until every proof is repeated.
