@@ -54,6 +54,7 @@ type AppsFlyerAdapterOptions = {
   getCustomerUserId?: () => string | null;
   isDebug: boolean;
   onDeepLinkIntent: (received: ReceivedDeepLinkIntent) => Promise<void>;
+  requestTrackingAuthorization?: () => Promise<boolean>;
   sdk: AppsFlyerSdk;
 };
 
@@ -75,15 +76,24 @@ export function createAppsFlyerAdapter({
   getCustomerUserId = () => null,
   isDebug,
   onDeepLinkIntent,
+  requestTrackingAuthorization = async () => false,
   sdk
 }: AppsFlyerAdapterOptions): MeasurementAdapter & {
   getAppsFlyerUid: () => Promise<string | null>;
+  isTrackingAuthorized: () => boolean;
   registerUninstallToken: (token: string) => Promise<void>;
 } {
   let initialized = false;
+  let trackingAuthorized = false;
 
   return {
     async start() {
+      try {
+        trackingAuthorized = await requestTrackingAuthorization();
+      } catch {
+        trackingAuthorized = false;
+      }
+
       if (!initialized) {
         sdk.onDeepLink((payload) => {
           if (payload.deepLinkStatus !== "FOUND") {
@@ -101,7 +111,11 @@ export function createAppsFlyerAdapter({
             intent
           }).catch(() => undefined);
         });
-        sdk.disableAdvertisingIdentifier(true);
+      }
+
+      sdk.disableAdvertisingIdentifier(!trackingAuthorized);
+
+      if (!initialized) {
         sdk.enableTCFDataCollection(false);
       }
 
@@ -110,7 +124,7 @@ export function createAppsFlyerAdapter({
           isUserSubjectToGDPR: true,
           hasConsentForDataUsage: true,
           hasConsentForAdsPersonalization: false,
-          hasConsentForAdStorage: true
+          hasConsentForAdStorage: trackingAuthorized
         })
       );
 
@@ -128,17 +142,21 @@ export function createAppsFlyerAdapter({
 
       const customerUserId = getCustomerUserId();
 
-      if (customerUserId) {
+      if (trackingAuthorized && customerUserId) {
         sdk.setCustomerUserId(customerUserId);
       }
-      sdk.anonymizeUser(false);
-      sdk.setSharingFilterForPartners([]);
+      sdk.anonymizeUser(!trackingAuthorized);
+      sdk.setSharingFilterForPartners(
+        trackingAuthorized ? [] : ["all"]
+      );
       sdk.stop(false);
       sdk.startSdk();
     },
 
     async disable() {
+      trackingAuthorized = false;
       sdk.enableTCFDataCollection(false);
+      sdk.disableAdvertisingIdentifier(true);
       sdk.setConsentData(
         createConsentData({
           isUserSubjectToGDPR: true,
@@ -147,6 +165,7 @@ export function createAppsFlyerAdapter({
           hasConsentForAdStorage: false
         })
       );
+      sdk.anonymizeUser(true);
       sdk.setSharingFilterForPartners(["all"]);
       sdk.stop(true);
     },
@@ -169,6 +188,10 @@ export function createAppsFlyerAdapter({
     },
 
     async setUser(userId: string, _properties: AnalyticsUserProperties) {
+      if (!trackingAuthorized) {
+        return;
+      }
+
       sdk.anonymizeUser(false);
       sdk.setCustomerUserId(userId);
     },
@@ -185,8 +208,12 @@ export function createAppsFlyerAdapter({
       });
     },
 
+    isTrackingAuthorized() {
+      return trackingAuthorized;
+    },
+
     async registerUninstallToken(token: string) {
-      if (token) {
+      if (trackingAuthorized && token) {
         sdk.updateServerUninstallToken(token);
       }
     }

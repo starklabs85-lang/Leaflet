@@ -8,6 +8,8 @@ const cameraPermission =
   "Fernly uses your camera to take plant photos for identification, health diagnosis, and growth tracking—for example, photographing a leaf to identify the plant or check for disease.";
 const photoLibraryPermission =
   "Fernly uses your photo library to choose plant photos for identification, health diagnosis, and growth tracking—for example, selecting a leaf photo to identify the plant or add it to a growth timeline.";
+const userTrackingPermission =
+  "Fernly uses your device identifier to measure which ads lead to installs and subscriptions. Your choice does not affect app features.";
 
 const config: ExpoConfig = {
   name: "Fernly",
@@ -63,6 +65,12 @@ const config: ExpoConfig = {
     ],
     "expo-notifications",
     "expo-apple-authentication",
+    [
+      "expo-tracking-transparency",
+      {
+        userTrackingPermission
+      }
+    ],
     [
       "react-native-appsflyer",
       {

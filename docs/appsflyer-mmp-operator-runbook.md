@@ -2,8 +2,8 @@
 
 App: Fernly (`id6775880316`)
 Bundle ID: `com.countrybean.leaflet`
-Scope: iOS, global including EEA/UK, no ATT prompt, no IDFA
-Last live audit: July 30, 2026
+Scope: iOS, global including EEA/UK, first-party measurement consent plus ATT
+Last live audit: August 13, 2026
 
 ## Connected systems and verified starting state
 
@@ -47,13 +47,19 @@ and deletion services do not depend on this choice.
 
 1. Show the choice before Firebase or AppsFlyer starts.
 2. Store the choice, policy version, and decision time on the installation.
-3. On acceptance, send AppsFlyer manual consent with data usage and storage
-   allowed, ad personalization denied, and GDPR treated as applicable.
-4. On rejection or withdrawal, keep Firebase disabled, stop AppsFlyer, block
+3. On acceptance, request Apple's ATT permission before AppsFlyer starts.
+4. When ATT is authorized, allow IDFA, AppsFlyer CUID, partner sharing,
+   RevenueCat attribution sync, and uninstall-token registration. Send manual
+   consent with data usage and storage allowed, ad personalization denied, and
+   GDPR treated as applicable.
+5. When ATT is denied or unavailable, disable IDFA and CUID, anonymize
+   AppsFlyer, block partner and RevenueCat attribution sharing, skip the
+   uninstall token, and allow only anonymous or aggregate attribution.
+6. On first-party rejection or withdrawal, keep Firebase disabled, stop AppsFlyer, block
    AppsFlyer partner sharing, and keep RevenueCat's AppsFlyer sharing filter.
-5. Discard pre-consent events; never buffer or replay them.
-6. Allow withdrawal and re-consent from Profile > Privacy choices.
-7. Validate accept, reject, reopen, withdraw, policy-version re-prompt, and
+7. Discard pre-consent events; never buffer or replay them.
+8. Allow withdrawal and re-consent from Profile > Privacy choices.
+9. Validate accept, reject, ATT deny/allow, reopen, withdraw, policy-version re-prompt, and
    re-consent on a physical iPhone.
 
 This implementation does not generate an IAB TCF string. Do not enable AdMob
@@ -98,14 +104,14 @@ https://fernly.onelink.me/cSib/test_activation
 5. Do not configure AppsFlyer Purchase Connector or client-side revenue events.
 6. Confirm the `$appsflyerSharingFilter` customer attribute is `"all"` before
    consent and after withdrawal, and absent only while measurement consent is
-   granted.
+   granted and ATT is authorized.
 7. Reconcile RevenueCat gross revenue with AppsFlyer; keep estimated net proceeds only in RevenueCat/Data Locker exports.
 
 The app synchronizes `$appsflyerId` after consent and retries immediately before
 purchase without blocking StoreKit if synchronization fails. It also applies
 RevenueCat's documented `$appsflyerSharingFilter=all` opt-out before consent and
 after withdrawal so RevenueCat's server-side lifecycle postbacks cannot be
-shared with AppsFlyer partners. It never collects or sets IDFA.
+shared with AppsFlyer partners. IDFA access is controlled exclusively by ATT.
 
 ## SKAN and AdAttributionKit
 
@@ -129,7 +135,9 @@ Keep Advanced Privacy and probabilistic modeling enabled. Enable re-engagement w
 
 ## Uninstall measurement
 
-Fernly registers the native APNs device token with AppsFlyer after consent. This is independent of notification alert authorization.
+Fernly registers the native APNs device token with AppsFlyer only after
+first-party consent and ATT authorization. This is independent of notification
+alert authorization.
 
 1. Create a production APNs `.p12` certificate for `com.countrybean.leaflet`.
 2. Upload it in AppsFlyer.
@@ -216,6 +224,9 @@ npm.cmd run typecheck
 npx.cmd expo config --type public --json
 ```
 
-Inspect the generated iOS project for plugin wiring, associated domains, postback endpoints, `FirebaseAnalyticsCollectionEnabled=false`, absence of `NSUserTrackingUsageDescription`, and absence of ATT/IDFA code.
+Inspect the generated iOS project for plugin wiring, associated domains,
+postback endpoints, `FirebaseAnalyticsCollectionEnabled=false`, and the exact
+`NSUserTrackingUsageDescription`. Verify ATT is requested only after the
+first-party accept action and all identifier paths remain disabled on denial.
 
 An EAS device build uploads source/configuration to Expo and requires explicit user approval. TestFlight submission also requires explicit approval and IPA inspection.

@@ -2,6 +2,7 @@ import { deepEqual, equal } from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  applyAppsFlyerPartnerAccess,
   getRevenueCatAppsFlyerSharingAttributes,
   syncAppsFlyerAttribution
 } from "./appsflyerAttribution";
@@ -42,4 +43,52 @@ test("does not block purchase flows when the AppsFlyer UID is unavailable", asyn
 
   equal(result, false);
   equal(setCalled, false);
+});
+
+test("ATT authorization enables RevenueCat attribution and uninstall measurement", async () => {
+  const calls: string[] = [];
+  const syncAttribution = async () => {
+    calls.push("sync");
+  };
+  await applyAppsFlyerPartnerAccess({
+    allowed: true,
+    registerAttributionSync: (sync) =>
+      calls.push(sync === syncAttribution ? "register" : "unregister"),
+    registerUninstallToken: async () => {
+      calls.push("uninstall");
+    },
+    setAppsFlyerId: async (value) => {
+      calls.push(`id:${String(value)}`);
+    },
+    setSharingAllowed: async (allowed) => {
+      calls.push(`sharing:${String(allowed)}`);
+    },
+    syncAttribution
+  });
+
+  deepEqual(calls, ["register", "sharing:true", "sync", "uninstall"]);
+});
+
+test("ATT denial clears RevenueCat attribution without calling identifier services", async () => {
+  const calls: string[] = [];
+
+  await applyAppsFlyerPartnerAccess({
+    allowed: false,
+    registerAttributionSync: (sync) =>
+      calls.push(sync === null ? "unregister" : "register"),
+    registerUninstallToken: async () => {
+      calls.push("uninstall");
+    },
+    setAppsFlyerId: async (value) => {
+      calls.push(`id:${String(value)}`);
+    },
+    setSharingAllowed: async (allowed) => {
+      calls.push(`sharing:${String(allowed)}`);
+    },
+    syncAttribution: async () => {
+      calls.push("sync");
+    }
+  });
+
+  deepEqual(calls, ["unregister", "sharing:false", "id:null"]);
 });

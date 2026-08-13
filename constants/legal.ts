@@ -1,4 +1,4 @@
-export const LEGAL_LAST_UPDATED = "July 30, 2026";
+export const LEGAL_LAST_UPDATED = "August 13, 2026";
 export const STANDARD_EULA_URL =
   "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 
@@ -27,12 +27,12 @@ export const PRIVACY_POLICY_SECTIONS = [
   {
     title: "Measurement and attribution",
     body:
-      "With your measurement consent, Fernly uses Firebase/Google Analytics and AppsFlyer to understand screen views, product milestones, campaign attribution, and subscription funnel outcomes. Fernly may use a pseudonymous Supabase user ID, an AppsFlyer installation ID, Apple’s vendor identifier (IDFV), IP-derived attribution signals, premium status, sign-in provider, onboarding status, platform, reminder status, weather-location source, and coarse count buckets. Fernly does not request App Tracking Transparency permission, collect IDFA, or send emails, names, photo contents or URIs, plant or species names, exact location, prompts, URLs, or raw errors to analytics."
+      "With your measurement consent, Fernly uses Firebase/Google Analytics and AppsFlyer to understand screen views, product milestones, campaign attribution, and subscription funnel outcomes. iOS may then ask for App Tracking Transparency permission. If Apple permission is authorized, Fernly may use the advertising identifier (IDFA), a pseudonymous Supabase user ID, an AppsFlyer installation ID, Apple’s vendor identifier (IDFV), IP-derived attribution signals, premium status, sign-in provider, onboarding status, platform, reminder status, weather-location source, and coarse count buckets for install and conversion measurement. If Apple permission is denied, Fernly disables IDFA, user-level AppsFlyer identity, partner sharing, RevenueCat attribution sharing, and AppsFlyer uninstall-token registration, while allowing only privacy-preserving anonymous or aggregate attribution. Fernly never sends emails, names, photo contents or URIs, plant or species names, exact location, prompts, URLs, or raw errors to analytics."
   },
   {
     title: "Privacy choices and partner sharing",
     body:
-      "Fernly presents its optional measurement choice before Firebase or AppsFlyer starts. Your choice is stored on this installation with the policy version and decision time; rejected events are not buffered or replayed. You can change or withdraw your choice at any time from Profile > Privacy choices. Withdrawal stops future analytics collection and AppsFlyer partner sharing. Advertising partners receive only consent-permitted install and selected conversion or subscription lifecycle postbacks; Fernly does not create IDFA-dependent audiences or generate an IAB TCF consent string."
+      "Fernly presents its optional measurement choice before Firebase or AppsFlyer starts. Your choice is stored on this installation with the policy version and decision time; rejected events are not buffered or replayed. Apple separately controls tracking permission in iOS Settings. You can change or withdraw Fernly’s measurement choice at any time from Profile > Privacy choices. Withdrawal stops future Firebase and AppsFlyer collection, partner sharing, subscription attribution synchronization, and uninstall measurement. Advertising partners receive only consent-permitted install and selected conversion or subscription lifecycle postbacks; Fernly does not create personalized-ad audiences or generate an IAB TCF consent string."
   },
   {
     title: "Subscription measurement",
@@ -70,6 +70,11 @@ export const STANDARD_EULA_SECTIONS = [
 ] as const;
 
 export const TERMS_SECTIONS = [
+  {
+    title: "Provider and brand",
+    body:
+      "Fernly is provided by Aditi Somani and operates under the Stark Labs brand. References to Fernly, we, or us in these terms mean Aditi Somani as the legal provider of the app."
+  },
   {
     title: "Using Fernly",
     body:

@@ -76,6 +76,22 @@ test("a changed policy version requires a fresh choice", async () => {
   assert.equal(await adapter.initialize(), "required");
 });
 
+test("the ATT policy revision re-prompts users who accepted the no-ATT policy", async () => {
+  const adapter = createFirstPartyConsentAdapter({
+    now: () => "2026-08-13T10:00:00.000Z",
+    requestChoice: async () => "granted",
+    storage: createMemoryStorage(
+      JSON.stringify({
+        choice: "granted",
+        policyVersion: "2026-07-30",
+        updatedAt: "2026-07-30T09:00:00.000Z"
+      })
+    )
+  });
+
+  assert.equal(await adapter.initialize(), "required");
+});
+
 test("the first-layer decision is durably recorded before it is applied", async () => {
   const storage = createMemoryStorage();
   const adapter = createFirstPartyConsentAdapter({

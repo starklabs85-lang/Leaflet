@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createAppsFlyerAdapter } from "./appsFlyerAdapter";
 
-test("AppsFlyer subscribes to UDL before initialization and starts manually", async () => {
+test("ATT authorization enables identifier attribution before AppsFlyer starts", async () => {
   const calls: string[] = [];
   let initOptions: Record<string, unknown> | null = null;
 
@@ -13,9 +13,15 @@ test("AppsFlyer subscribes to UDL before initialization and starts manually", as
     devKey: "dev-key",
     isDebug: false,
     onDeepLinkIntent: async () => undefined,
+    requestTrackingAuthorization: async () => {
+      calls.push("request-att");
+      return true;
+    },
     sdk: {
-      anonymizeUser: () => undefined,
-      disableAdvertisingIdentifier: () => calls.push("disable-idfa"),
+      anonymizeUser: (enabled) =>
+        calls.push(`anonymize:${String(enabled)}`),
+      disableAdvertisingIdentifier: (disabled) =>
+        calls.push(`disable-idfa:${String(disabled)}`),
       enableTCFDataCollection: (enabled) =>
         calls.push(`tcf:${String(enabled)}`),
       getAppsFlyerUID: () => undefined,
@@ -32,7 +38,8 @@ test("AppsFlyer subscribes to UDL before initialization and starts manually", as
       setCustomerUserId: () => undefined,
       setConsentData: (consent) =>
         calls.push(`consent:${JSON.stringify(consent)}`),
-      setSharingFilterForPartners: () => undefined,
+      setSharingFilterForPartners: (partners) =>
+        calls.push(`sharing:${partners.join(",")}`),
       startSdk: () => calls.push("start"),
       stop: () => undefined,
       updateServerUninstallToken: () => undefined
@@ -42,11 +49,14 @@ test("AppsFlyer subscribes to UDL before initialization and starts manually", as
   await adapter.start();
 
   assert.deepEqual(calls, [
+    "request-att",
     "subscribe-udl",
-    "disable-idfa",
+    "disable-idfa:false",
     "tcf:false",
     'consent:{"isUserSubjectToGDPR":true,"hasConsentForDataUsage":true,"hasConsentForAdsPersonalization":false,"hasConsentForAdStorage":true}',
     "init",
+    "anonymize:false",
+    "sharing:",
     "start"
   ]);
   assert.deepEqual(initOptions, {
@@ -58,6 +68,95 @@ test("AppsFlyer subscribes to UDL before initialization and starts manually", as
     onInstallConversionDataListener: false
   });
   assert.equal("timeToWaitForATTUserAuthorization" in initOptions!, false);
+  assert.equal(adapter.isTrackingAuthorized(), true);
+});
+
+test("ATT denial keeps AppsFlyer anonymous and suppresses user-level attribution", async () => {
+  const calls: string[] = [];
+  const adapter = createAppsFlyerAdapter({
+    appId: "6775880316",
+    createConsentData: (consent) => consent,
+    devKey: "dev-key",
+    getCustomerUserId: () => "supabase-user-id",
+    isDebug: false,
+    onDeepLinkIntent: async () => undefined,
+    requestTrackingAuthorization: async () => false,
+    sdk: {
+      anonymizeUser: (enabled) =>
+        calls.push(`anonymize:${String(enabled)}`),
+      disableAdvertisingIdentifier: (disabled) =>
+        calls.push(`disable-idfa:${String(disabled)}`),
+      enableTCFDataCollection: () => undefined,
+      getAppsFlyerUID: () => undefined,
+      initSdk: async () => "ok",
+      logEvent: async () => "ok",
+      onDeepLink: () => () => undefined,
+      setCustomerUserId: (value) => calls.push(`cuid:${value}`),
+      setConsentData: (consent) =>
+        calls.push(`consent:${JSON.stringify(consent)}`),
+      setSharingFilterForPartners: (partners) =>
+        calls.push(`sharing:${partners.join(",")}`),
+      startSdk: () => calls.push("start"),
+      stop: () => undefined,
+      updateServerUninstallToken: (token) =>
+        calls.push(`uninstall:${token}`)
+    }
+  });
+
+  await adapter.start();
+  await adapter.setUser("later-user-id", {});
+  await adapter.registerUninstallToken("apns-token");
+
+  assert.deepEqual(calls, [
+    "disable-idfa:true",
+    'consent:{"isUserSubjectToGDPR":true,"hasConsentForDataUsage":true,"hasConsentForAdsPersonalization":false,"hasConsentForAdStorage":false}',
+    "anonymize:true",
+    "sharing:all",
+    "start"
+  ]);
+  assert.equal(adapter.isTrackingAuthorized(), false);
+});
+
+test("ATT request failure fails closed without preventing anonymous measurement", async () => {
+  const calls: string[] = [];
+  const adapter = createAppsFlyerAdapter({
+    appId: "6775880316",
+    createConsentData: (consent) => consent,
+    devKey: "dev-key",
+    isDebug: false,
+    onDeepLinkIntent: async () => undefined,
+    requestTrackingAuthorization: async () => {
+      throw new Error("ATT unavailable");
+    },
+    sdk: {
+      anonymizeUser: (enabled) =>
+        calls.push(`anonymize:${String(enabled)}`),
+      disableAdvertisingIdentifier: (disabled) =>
+        calls.push(`disable-idfa:${String(disabled)}`),
+      enableTCFDataCollection: () => undefined,
+      getAppsFlyerUID: () => undefined,
+      initSdk: async () => "ok",
+      logEvent: async () => "ok",
+      onDeepLink: () => () => undefined,
+      setCustomerUserId: () => calls.push("cuid"),
+      setConsentData: () => undefined,
+      setSharingFilterForPartners: (partners) =>
+        calls.push(`sharing:${partners.join(",")}`),
+      startSdk: () => calls.push("start"),
+      stop: () => undefined,
+      updateServerUninstallToken: () => undefined
+    }
+  });
+
+  await adapter.start();
+
+  assert.deepEqual(calls, [
+    "disable-idfa:true",
+    "anonymize:true",
+    "sharing:all",
+    "start"
+  ]);
+  assert.equal(adapter.isTrackingAuthorized(), false);
 });
 
 test("AppsFlyer persists only parsed deep-link intent metadata", async () => {
@@ -168,6 +267,7 @@ test("sets the Supabase CUID after consent but before the AppsFlyer start event"
     getCustomerUserId: () => "supabase-user-id",
     isDebug: false,
     onDeepLinkIntent: async () => undefined,
+    requestTrackingAuthorization: async () => true,
     sdk: {
       anonymizeUser: () => undefined,
       disableAdvertisingIdentifier: () => undefined,
@@ -239,6 +339,7 @@ test("re-consent refreshes the granted signal before restarting an initialized S
     devKey: "dev-key",
     isDebug: false,
     onDeepLinkIntent: async () => undefined,
+    requestTrackingAuthorization: async () => true,
     sdk: {
       anonymizeUser: () => undefined,
       disableAdvertisingIdentifier: () => undefined,

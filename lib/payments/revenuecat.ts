@@ -74,8 +74,9 @@ export function configurePurchases() {
 
 /**
  * RevenueCat forwards subscription lifecycle and gross revenue to AppsFlyer.
- * Only the AppsFlyer UID is set here; Fernly never asks RevenueCat to collect
- * device identifiers and never supplies IDFA.
+ * Only the AppsFlyer UID is set here, and only after both Fernly measurement
+ * consent and Apple tracking authorization. Fernly does not ask RevenueCat to
+ * collect device identifiers directly.
  */
 export async function setRevenueCatAppsFlyerId(uid: string | null) {
   pendingAppsFlyerId = uid;

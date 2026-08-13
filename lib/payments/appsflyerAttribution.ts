@@ -3,6 +3,17 @@ type AppsFlyerAttributionDependencies = {
   setAppsFlyerId: (value: string | null) => Promise<void>;
 };
 
+type AppsFlyerPartnerAccessDependencies = {
+  allowed: boolean;
+  registerAttributionSync: (
+    sync: (() => Promise<void>) | null
+  ) => void;
+  registerUninstallToken: () => Promise<void>;
+  setAppsFlyerId: (value: string | null) => Promise<void>;
+  setSharingAllowed: (allowed: boolean) => Promise<void>;
+  syncAttribution: () => Promise<void>;
+};
+
 export const REVENUECAT_APPSFLYER_SHARING_FILTER =
   "$appsflyerSharingFilter";
 
@@ -28,4 +39,29 @@ export async function syncAppsFlyerAttribution({
   } catch {
     return false;
   }
+}
+
+export async function applyAppsFlyerPartnerAccess({
+  allowed,
+  registerAttributionSync,
+  registerUninstallToken,
+  setAppsFlyerId,
+  setSharingAllowed,
+  syncAttribution
+}: AppsFlyerPartnerAccessDependencies) {
+  if (allowed) {
+    registerAttributionSync(syncAttribution);
+    await setSharingAllowed(true).catch(() => undefined);
+    await Promise.allSettled([
+      syncAttribution(),
+      registerUninstallToken()
+    ]);
+    return;
+  }
+
+  registerAttributionSync(null);
+  await Promise.allSettled([
+    setSharingAllowed(false),
+    setAppsFlyerId(null)
+  ]);
 }

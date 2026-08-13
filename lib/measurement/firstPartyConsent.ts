@@ -11,7 +11,7 @@ import {
 } from "./consentPrompt";
 
 const STORAGE_KEY = "fernly.measurement-consent";
-const POLICY_VERSION = "2026-07-30";
+const POLICY_VERSION = "2026-08-13";
 
 type ConsentStorage = {
   getItem: (key: string) => Promise<string | null>;

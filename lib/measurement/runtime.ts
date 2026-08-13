@@ -15,11 +15,14 @@ import {
 import { storePendingDeepLink } from "@/lib/deepLinks/pendingOneLink";
 import { env, hasMeasurementConfig } from "@/lib/env";
 import {
+  applyAppsFlyerPartnerAccess,
+  syncAppsFlyerAttribution
+} from "@/lib/payments/appsflyerAttribution";
+import {
   registerRevenueCatAttributionSync,
   setRevenueCatAppsFlyerId,
   setRevenueCatAppsFlyerSharingAllowed
 } from "@/lib/payments/revenuecat";
-import { syncAppsFlyerAttribution } from "@/lib/payments/appsflyerAttribution";
 
 import {
   createAppsFlyerAdapter,
@@ -65,6 +68,14 @@ async function prepareController() {
       getCustomerUserId: () => pendingUser?.id ?? null,
       isDebug: __DEV__,
       onDeepLinkIntent: storePendingDeepLink,
+      requestTrackingAuthorization: async () => {
+        const { requestTrackingPermissionsAsync } = await import(
+          "expo-tracking-transparency"
+        );
+        const permission = await requestTrackingPermissionsAsync();
+
+        return permission.status === "granted";
+      },
       sdk: loadedAppsFlyer.sdk
     });
     consentAdapter = createFirstPartyConsentAdapter();
@@ -78,8 +89,6 @@ async function prepareController() {
       sanitizeParams: (name, params) =>
         sanitizeDeclaredAnalyticsParams(name as AnalyticsEventName, params)
     });
-
-    registerRevenueCatAttributionSync(syncAttribution);
     return controller;
   })().catch(() => null);
 
@@ -87,7 +96,10 @@ async function prepareController() {
 }
 
 async function syncAttribution() {
-  if (!appsFlyerAdapter || controller?.getState() !== "started") {
+  if (
+    !appsFlyerAdapter?.isTrackingAuthorized() ||
+    controller?.getState() !== "started"
+  ) {
     return;
   }
 
@@ -114,24 +126,26 @@ async function registerUninstallToken() {
 }
 
 async function finishState(state: MeasurementState) {
-  if (state === "started") {
-    await setRevenueCatAppsFlyerSharingAllowed(true).catch(() => undefined);
-    await Promise.allSettled([
-      syncAttribution(),
-      registerUninstallToken(),
-      pendingUser
-        ? controller?.setAnalyticsUser(
-            pendingUser.id,
-            pendingUser.properties
-          ) ?? Promise.resolve()
-        : Promise.resolve()
-    ]);
-  } else {
-    registerRevenueCatAttributionSync(null);
-    await Promise.allSettled([
-      setRevenueCatAppsFlyerSharingAllowed(false),
-      setRevenueCatAppsFlyerId(null)
-    ]);
+  const partnerAccessAllowed =
+    state === "started" &&
+    appsFlyerAdapter?.isTrackingAuthorized() === true;
+
+  await applyAppsFlyerPartnerAccess({
+    allowed: partnerAccessAllowed,
+    registerAttributionSync: registerRevenueCatAttributionSync,
+    registerUninstallToken,
+    setAppsFlyerId: setRevenueCatAppsFlyerId,
+    setSharingAllowed: setRevenueCatAppsFlyerSharingAllowed,
+    syncAttribution
+  });
+
+  if (state === "started" && pendingUser) {
+    await (
+      controller?.setAnalyticsUser(
+        pendingUser.id,
+        pendingUser.properties
+      ) ?? Promise.resolve()
+    );
   }
 
   return state;
@@ -155,10 +169,6 @@ export async function applyMeasurementConsent(): Promise<MeasurementState> {
   }
 
   const state = await prepared.applyMeasurementConsent();
-
-  if (state === "started") {
-    registerRevenueCatAttributionSync(syncAttribution);
-  }
 
   return finishState(state);
 }

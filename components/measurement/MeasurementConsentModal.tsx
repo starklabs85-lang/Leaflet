@@ -114,14 +114,19 @@ export function MeasurementConsentModal() {
               <Text style={styles.cardBody}>
                 If allowed, Firebase and AppsFlyer receive allowlisted screen
                 views, product milestones, a pseudonymous user ID, an
-                AppsFlyer installation ID, consent-permitted IDFV and
-                IP-derived attribution signals.
+                AppsFlyer installation ID, consent-permitted device signals,
+                and campaign attribution data.
               </Text>
               <Text style={styles.cardBody}>
-                Fernly does not request ATT permission, collect IDFA, create
-                personalized-ad audiences, or send photos, plant names, email
-                addresses, exact location, prompts, URLs or raw errors to
-                analytics.
+                If you accept, iOS may next ask whether Fernly can use your
+                device identifier to measure ads. If you decline Apple’s
+                request, AppsFlyer stays anonymous and identifier-based
+                attribution, partner sharing, and subscription attribution
+                stay off.
+              </Text>
+              <Text style={styles.cardBody}>
+                Fernly never sends photos, plant names, email addresses,
+                exact location, prompts, URLs, or raw errors to analytics.
               </Text>
             </Card>
           </View>
@@ -133,9 +138,13 @@ export function MeasurementConsentModal() {
 
           <View style={styles.actions}>
             <Button
-              accessibilityHint="Starts optional Firebase and AppsFlyer measurement."
+              accessibilityHint="Allows optional measurement and may show Apple's tracking permission next."
               icon="check"
-              label={isSettings ? "Allow analytics" : "Accept analytics"}
+              label={
+                isSettings
+                  ? "Allow analytics & attribution"
+                  : "Continue to Apple choice"
+              }
               onPress={() =>
                 measurementConsentPrompt.submitChoice("granted")
               }
