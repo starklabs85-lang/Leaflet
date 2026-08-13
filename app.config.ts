@@ -17,10 +17,10 @@ const config: ExpoConfig = {
   orientation: "portrait",
   userInterfaceStyle: "light",
   newArchEnabled: true,
-  icon: "./FlexLeaf Plant Analyzer Creatives.png",
+  icon: "./assets/icon.png",
   ios: {
     supportsTablet: true,
-    icon: "./FlexLeaf Plant Analyzer Creatives.png",
+    icon: "./assets/icon.png",
     bundleIdentifier: "com.countrybean.leaflet",
     usesAppleSignIn: true,
     googleServicesFile: "./GoogleService-Info.plist",
