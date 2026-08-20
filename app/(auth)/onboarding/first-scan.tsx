@@ -6,10 +6,12 @@ import { StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { theme } from "@/constants/theme";
+import { getCameraPermissionPromptCopy } from "@/lib/cameraPermissionPrompt";
 import { useOnboarding } from "@/providers/OnboardingProvider";
 
 export default function FirstScanPromptScreen() {
   const onboarding = useOnboarding();
+  const cameraPermissionPrompt = getCameraPermissionPromptCopy();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [message, setMessage] = useState<string | null>(null);
 
@@ -51,10 +53,10 @@ export default function FirstScanPromptScreen() {
 
       <View style={styles.actions}>
         <Button
-          accessibilityLabel="Open camera for first plant scan"
+          accessibilityLabel={cameraPermissionPrompt.accessibilityLabel}
           gradient
           icon="camera"
-          label="Open camera"
+          label={cameraPermissionPrompt.buttonLabel}
           onPress={openCamera}
         />
         <Button

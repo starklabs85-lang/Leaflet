@@ -28,6 +28,7 @@ import {
   ANALYTICS_EVENTS,
   trackAction
 } from "@/lib/analytics/firebaseAnalytics";
+import { getCameraPermissionPromptCopy } from "@/lib/cameraPermissionPrompt";
 import {
   diagnosePlantPhoto,
   fetchDiagnosisSpeciesContext
@@ -83,6 +84,7 @@ export default function ScanScreen() {
   const [limitTitle, setLimitTitle] = useState<string | null>(null);
   const { isPremium } = useEntitlement();
   const pendingScan = usePendingScan();
+  const cameraPermissionPrompt = getCameraPermissionPromptCopy();
 
   useEffect(() => {
     const nextMode = getInitialMode(params.mode);
@@ -593,10 +595,10 @@ export default function ScanScreen() {
               We only ask for camera access when you choose to scan a plant.
             </Text>
             <Button
-              accessibilityLabel="Enable camera access"
+              accessibilityLabel={cameraPermissionPrompt.accessibilityLabel}
               gradient
               icon="camera"
-              label="Enable camera"
+              label={cameraPermissionPrompt.buttonLabel}
               onPress={requestCameraPermission}
             />
           </View>
