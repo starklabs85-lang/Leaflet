@@ -1,6 +1,8 @@
 import type { ExpoConfig } from "expo/config";
 
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME;
+const googleServicesFile =
+  process.env.GOOGLE_SERVICES_INFO_PLIST ?? "./GoogleService-Info.plist";
 const appsFlyerOneLinkHost = normalizeHttpsHost(
   process.env.EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN
 );
@@ -25,7 +27,7 @@ const config: ExpoConfig = {
     icon: "./assets/icon.png",
     bundleIdentifier: "com.countrybean.leaflet",
     usesAppleSignIn: true,
-    googleServicesFile: "./GoogleService-Info.plist",
+    googleServicesFile,
     ...(appsFlyerOneLinkHost
       ? { associatedDomains: [`applinks:${appsFlyerOneLinkHost}`] }
       : {}),

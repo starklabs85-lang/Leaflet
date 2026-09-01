@@ -1,4 +1,6 @@
 *.p8
+.env
+.env.local
 GoogleService-Info.plist
 google-services.json
 private/

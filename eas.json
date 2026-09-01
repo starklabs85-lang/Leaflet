@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "env": {
         "EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN": "fernly.onelink.me",
         "EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID": "cSib"
@@ -21,6 +22,7 @@
     "development-device": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "env": {
         "EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN": "fernly.onelink.me",
         "EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID": "cSib"
@@ -31,6 +33,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "env": {
         "EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN": "fernly.onelink.me",
         "EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID": "cSib"
@@ -38,6 +41,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_APPSFLYER_ONELINK_DOMAIN": "fernly.onelink.me",
         "EXPO_PUBLIC_APPSFLYER_ONELINK_TEMPLATE_ID": "cSib"
