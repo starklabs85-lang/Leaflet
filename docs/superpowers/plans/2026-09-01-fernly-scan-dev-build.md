@@ -94,14 +94,14 @@
 
   Run focused tests, production-ops tests, build-config tests, analytics validation, direct TypeScript checking, Expo config inspection, and icon SHA-256 comparison.
 
-- [ ] **Step 2: Commit and push the isolated branch**
+- [x] **Step 2: Commit and push the isolated branch**
 
   Commit only source, tests, configuration, and redacted documentation. Push `codex/fernly-build30-icon-scan-fix`.
 
-- [ ] **Step 3: Start the signed iOS development build**
+- [x] **Step 3: Start the signed iOS development build**
 
   Run `eas build --profile development-device --platform ios --non-interactive` and wait for completion. Do not use a production profile or auto-submit.
 
-- [ ] **Step 4: Record redacted QC evidence**
+- [x] **Step 4: Record redacted QC evidence**
 
   Record the exact branch/commit, icon digest, test results, configuration-name proof, EAS build ID/status, and install URL without configuration values.

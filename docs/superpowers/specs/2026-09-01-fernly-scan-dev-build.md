@@ -10,7 +10,7 @@ Create an iOS device development build that uses the exact build 30 icon and can
 - `assets/icon.png` at build 30 and on the current release branch have the identical SHA-256 digest `84133ffc80b9c77023e1e72c0bd61120ec5be9a27120c175935454d9428ae702`.
 - The deployed `identify-plant` Edge Function is active and accepts authenticated traffic.
 - The configured QA account is Free; the live function correctly returns `premium_required`. Premium enforcement must not be bypassed.
-- The EAS development environment lacks the Supabase, RevenueCat, and Google client configuration required by an iOS development build.
+- The EAS development environment initially lacked the Supabase, RevenueCat, and Google client configuration required by an iOS development build; this task adds those named values without exposing them.
 
 ## Requirements
 
