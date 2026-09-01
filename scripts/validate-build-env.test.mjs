@@ -14,6 +14,7 @@ const VALID_IOS_ENV = {
   EXPO_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
   GOOGLE_SERVICES_INFO_PLIST: "/private/build/GoogleService-Info.plist"
 };
+const XML_PLIST = () => Buffer.from("<?xml version=\"1.0\"?><plist></plist>");
 
 test("fails an iOS build before compilation when client configuration is missing", () => {
   const result = validateBuildEnvironment(
@@ -22,7 +23,8 @@ test("fails an iOS build before compilation when client configuration is missing
       EAS_BUILD_PROFILE: "development-device",
       GOOGLE_SERVICES_INFO_PLIST: "/private/build/GoogleService-Info.plist"
     },
-    () => true
+    () => true,
+    XML_PLIST
   );
 
   assert.equal(result.ok, false);
@@ -43,6 +45,19 @@ test("fails an iOS build when its Firebase plist is unavailable", () => {
   assert.deepEqual(result.errors, ["Missing iOS Firebase configuration file."]);
 });
 
+test("fails before Expo introspection when the Firebase plist is binary", () => {
+  const result = validateBuildEnvironment(
+    VALID_IOS_ENV,
+    () => true,
+    () => Buffer.from("bplist00")
+  );
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.errors, [
+    "iOS Firebase configuration file must use XML plist format."
+  ]);
+});
+
 test("rejects dev-login credentials from a production build", () => {
   const result = validateBuildEnvironment(
     {
@@ -51,7 +66,8 @@ test("rejects dev-login credentials from a production build", () => {
       EXPO_PUBLIC_DEV_TEST_EMAIL: "qa@example.com",
       EXPO_PUBLIC_DEV_TEST_PASSWORD: "not-for-production"
     },
-    () => true
+    () => true,
+    XML_PLIST
   );
 
   assert.equal(result.ok, false);
@@ -62,10 +78,14 @@ test("rejects dev-login credentials from a production build", () => {
 
 test("accepts a fully configured iOS development build", () => {
   const checkedPaths = [];
-  const result = validateBuildEnvironment(VALID_IOS_ENV, (path) => {
-    checkedPaths.push(path);
-    return true;
-  });
+  const result = validateBuildEnvironment(
+    VALID_IOS_ENV,
+    (path) => {
+      checkedPaths.push(path);
+      return true;
+    },
+    XML_PLIST
+  );
 
   assert.deepEqual(result, { ok: true, errors: [] });
   assert.deepEqual(checkedPaths, ["/private/build/GoogleService-Info.plist"]);

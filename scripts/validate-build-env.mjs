@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const COMMON_REQUIRED_VARIABLES = [
@@ -18,7 +18,11 @@ const ANDROID_REQUIRED_VARIABLES = [
   "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID"
 ];
 
-export function validateBuildEnvironment(env, fileExists = existsSync) {
+export function validateBuildEnvironment(
+  env,
+  fileExists = existsSync,
+  readFile = readFileSync
+) {
   const platform = env.EAS_BUILD_PLATFORM;
   const requiredVariables = [
     ...COMMON_REQUIRED_VARIABLES,
@@ -39,6 +43,16 @@ export function validateBuildEnvironment(env, fileExists = existsSync) {
 
     if (!fileExists(plistPath)) {
       errors.push("Missing iOS Firebase configuration file.");
+    } else {
+      try {
+        const plist = readFile(plistPath);
+
+        if (!String(plist).trimStart().startsWith("<?xml")) {
+          errors.push("iOS Firebase configuration file must use XML plist format.");
+        }
+      } catch {
+        errors.push("Missing iOS Firebase configuration file.");
+      }
     }
   }
 
